@@ -2,18 +2,20 @@
 input_filename = Enum.at(System.argv(), 0)
 {:ok, input_content} = File.read(input_filename)
 
-elf_calories = String.split(input_content, "\n") |>            # Tokenize
-               Enum.map(fn "" -> :separator                    # Decode tokens
+separator? = fn x -> x == :separator end
+
+elf_calories = String.split(input_content, "\n") |>                   # Tokenize string
+               Enum.map(fn "" -> :separator                           # Decode tokens
                         cal -> String.to_integer(cal) end) |>
-               Enum.chunk_by(fn x -> x == :separator end) |>   # Group calories per elf in separated lists
-               Enum.reject(fn x -> x == [:separator] end) |>   # Remove list with separator in between elfs
-               Enum.map(fn elf -> Enum.reduce(                 # Sum total calories per elf
+               Enum.chunk_by(separator?) |>                           # Group calories per elf in distinct lists
+               Enum.reject(fn x -> Enum.all?(x, separator?) end) |>   # Remove separator between elfs
+               Enum.map(fn elf -> Enum.reduce(                        # Calculate total number of calories per elf
                 elf, 0, fn cal, total -> total + cal end) end)
 
 # IO.inspect(elf_calories)
 
 # Part 1: How many total calories the elf with most calories has?
-IO.inspect(Enum.max(elf_calories), label: "Elf with most")
+Enum.max(elf_calories) |> IO.inspect(label: "Elf with most")
 
 # Part 2: How many calories the the top three elf have in total?
-IO.inspect(Enum.sum(Enum.slice(Enum.sort(elf_calories, &(&1 >= &2)), 0..2)), label: "Top three total")
+Enum.sort(elf_calories, &(&1 >= &2)) |> Enum.slice(0..2) |> Enum.sum() |> IO.inspect(label: "Top three total")
