@@ -1,41 +1,19 @@
 #! /usr/bin/env elixir
-defmodule ElfCalories do
-    def parse(input) do
-        parse(String.split(input, "\n"), [0])
-    end
-
-    def parse([], output) do
-        Enum.reverse(output)
-    end
-    
-    def parse(["" | []], output) do
-        Enum.reverse(output)
-    end
-
-
-    def parse(["" | input], output) do
-        parse(input, [0 | output])
-    end
-
-    def parse([i | input], [o | output]) do
-        parse(input, [(o + String.to_integer(i)) | output])
-    end
-end
-
 input_filename = Enum.at(System.argv(), 0)
-
 {:ok, input_content} = File.read(input_filename)
 
-elf_calories = ElfCalories.parse(input_content)
+elf_calories = String.split(input_content, "\n") |>            # Tokenize
+               Enum.map(fn "" -> :separator                    # Decode tokens
+                        cal -> String.to_integer(cal) end) |>
+               Enum.chunk_by(fn x -> x == :separator end) |>   # Group calories per elf in separated lists
+               Enum.reject(fn x -> x == [:separator] end) |>   # Remove list with separator in between elfs
+               Enum.map(fn elf -> Enum.reduce(                 # Sum total calories per elf
+                elf, 0, fn cal, total -> total + cal end) end)
 
 # IO.inspect(elf_calories)
 
 # Part 1: How many total calories the elf with most calories has?
-IO.puts("Elf with most calories has: ")
-elf_most_calories = Enum.max(elf_calories)
-IO.inspect(elf_most_calories)
+IO.inspect(Enum.max(elf_calories), label: "Elf with most")
 
 # Part 2: How many calories the the top three elf have in total?
-top_three = Enum.slice(Enum.sort(elf_calories, &(&1 >= &2)), 0..2)
-IO.puts("Top tree elfs have in total:")
-IO.inspect(Enum.sum(top_three))
+IO.inspect(Enum.sum(Enum.slice(Enum.sort(elf_calories, &(&1 >= &2)), 0..2)), label: "Top three total")
