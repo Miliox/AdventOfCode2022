@@ -1,0 +1,71 @@
+#! /usr/bin/env elixir
+defmodule JanKenPo do
+    def beats_against(:rock),     do: :paper
+    def beats_against(:paper),    do: :scissors
+    def beats_against(:scissors), do: :rock
+
+    def draws_against(hand), do: hand
+
+    def loses_against(:rock),     do: :scissors
+    def loses_against(:paper),    do: :rock
+    def loses_against(:scissors), do: :paper
+
+    def decode_hand_part1(hand) when hand == ?A or hand == ?X, do: :rock
+    def decode_hand_part1(hand) when hand == ?B or hand == ?Y, do: :paper
+    def decode_hand_part1(hand) when hand == ?C or hand == ?Z, do: :scissors
+
+    def decode_play_part1([their_hand, ?\s, my_hand]) do
+        {decode_hand_part1(their_hand), decode_hand_part1(my_hand)}
+    end
+
+    def decode_hand_part2(?A), do: :rock
+    def decode_hand_part2(?B), do: :paper
+    def decode_hand_part2(?C), do: :scissors
+
+    def decode_hand_part2(their_hand, ?X), do: loses_against(decode_hand_part2(their_hand))
+    def decode_hand_part2(their_hand, ?Y), do: draws_against(decode_hand_part2(their_hand))
+    def decode_hand_part2(their_hand, ?Z), do: beats_against(decode_hand_part2(their_hand))
+
+    def decode_play_part2([their_hand, ?\s, strategy]) do
+        {decode_hand_part2(their_hand), decode_hand_part2(their_hand, strategy)}
+    end
+
+    def score_play({their_hand, my_hand}) do
+        hand_score = case my_hand do
+            :rock -> 1
+            :paper -> 2
+            :scissors -> 3
+        end
+
+        winning_hand = beats_against(their_hand)
+        drawing_hand = draws_against(their_hand)
+        losing_hand  = loses_against(their_hand)
+
+        outcome_score = case my_hand do
+            ^winning_hand -> 6
+            ^drawing_hand -> 3
+            ^losing_hand  -> 0
+        end
+
+        hand_score + outcome_score
+    end
+
+end
+
+{:ok, input_content} = Enum.at(System.argv(), 0) |> File.read()
+                  
+input_sequence = String.trim(input_content) |>
+                 String.split("\n") |>
+                 Enum.map(&String.to_charlist/1)
+
+score_sequence_part1 = Enum.map(input_sequence, &JanKenPo.decode_play_part1/1) |>
+                       Enum.map(&JanKenPo.score_play/1)
+
+# What would your total score be if everything goes exactly according to your strategy guide?
+Enum.sum(score_sequence_part1) |> IO.inspect(label: "Total score (Part 1)")
+
+score_sequence_part2 = Enum.map(input_sequence, &JanKenPo.decode_play_part2/1) |>
+                       Enum.map(&JanKenPo.score_play/1)
+
+# what would your total score be if everything goes exactly according to your strategy guide?
+Enum.sum(score_sequence_part2) |> IO.inspect(label: "Total score (Part 2)")
