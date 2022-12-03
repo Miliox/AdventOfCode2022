@@ -5,12 +5,9 @@ input_sequence = String.trim(input_content) |>
                  String.split("\n") |>
                  Enum.map(&String.to_charlist/1) |>
                  Enum.map(&(Enum.split(&1, div(length(&1), 2)))) |>
-                 Enum.map(fn {a,b} ->
-                    [common] = MapSet.to_list(MapSet.intersection(MapSet.new(a), MapSet.new(b)))
-                    common
-                 end) |>
+                 Enum.map(fn {a,b} -> MapSet.intersection(MapSet.new(a), MapSet.new(b)) |> Enum.at(0) end) |>
                  Enum.map(fn
-                    small_case when small_case >= ?a and small_case <= ?z -> small_case - ?a + 1
+                    lower_case when lower_case >= ?a and lower_case <= ?z -> lower_case - ?a + 1
                     upper_case when upper_case >= ?A and upper_case <= ?z -> upper_case - ?A + 27
                  end)
 
