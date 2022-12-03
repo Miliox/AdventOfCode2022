@@ -1,15 +1,34 @@
 #! /usr/bin/env elixir
-{:ok, input_content} = Enum.at(System.argv(), 0) |> File.read()
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+decode_letter = fn
+    lower_case when lower_case >= ?a and lower_case <= ?z -> lower_case - ?a + 1
+    upper_case when upper_case >= ?A and upper_case <= ?z -> upper_case - ?A + 27
+end
                   
 input_sequence = String.trim(input_content) |>
                  String.split("\n") |>
-                 Enum.map(&String.to_charlist/1) |>
-                 Enum.map(&(Enum.split(&1, div(length(&1), 2)))) |>
-                 Enum.map(fn {a,b} -> MapSet.intersection(MapSet.new(a), MapSet.new(b)) |> Enum.at(0) end) |>
-                 Enum.map(fn
-                    lower_case when lower_case >= ?a and lower_case <= ?z -> lower_case - ?a + 1
-                    upper_case when upper_case >= ?A and upper_case <= ?z -> upper_case - ?A + 27
-                 end)
+                 Enum.map(&String.to_charlist/1)
+
+part1_input = input_sequence |>
+              Enum.map(&(Enum.split(&1, div(length(&1), 2)))) |>
+              Enum.map(fn {a,b} ->
+                MapSet.intersection(MapSet.new(a), MapSet.new(b)) |>
+                Enum.at(0)
+              end) |>
+              Enum.map(decode_letter)
 
 # Part1: What is the sum of the priorities of those item types?
-IO.inspect(Enum.sum(input_sequence), label: "Sum of priorities")
+IO.inspect(Enum.sum(part1_input), label: "Part1 Sum:")
+
+part2_input = input_sequence |>
+              Enum.chunk_every(3) |>
+              Enum.map(fn [a, b, c] ->
+                {a, b, c} = {MapSet.new(a), MapSet.new(b), MapSet.new(c)}
+                MapSet.intersection(MapSet.intersection(a, b), c) |>
+                Enum.at(0)
+              end) |>
+              Enum.map(decode_letter)
+
+# Part 2: What is the sum of the priorities of those item types?
+IO.inspect(Enum.sum(part2_input), label: "Part2 sum")
