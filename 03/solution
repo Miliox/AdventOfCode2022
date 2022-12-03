@@ -1,0 +1,18 @@
+#! /usr/bin/env elixir
+{:ok, input_content} = Enum.at(System.argv(), 0) |> File.read()
+                  
+input_sequence = String.trim(input_content) |>
+                 String.split("\n") |>
+                 Enum.map(&String.to_charlist/1) |>
+                 Enum.map(&(Enum.split(&1, div(length(&1), 2)))) |>
+                 Enum.map(fn {a,b} ->
+                    [common] = MapSet.to_list(MapSet.intersection(MapSet.new(a), MapSet.new(b)))
+                    common
+                 end) |>
+                 Enum.map(fn
+                    small_case when small_case >= ?a and small_case <= ?z -> small_case - ?a + 1
+                    upper_case when upper_case >= ?A and upper_case <= ?z -> upper_case - ?A + 27
+                 end)
+
+# Part1: What is the sum of the priorities of those item types?
+IO.inspect(Enum.sum(input_sequence), label: "Sum of priorities")
