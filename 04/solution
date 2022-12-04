@@ -18,17 +18,33 @@ fully_contains? = fn [elf1_begin, elf1_end, elf2_begin, elf2_end] ->
   end
 end
 
+overlaps? = fn [elf1_begin, elf1_end, elf2_begin, elf2_end] ->
+  cond do
+    elf1_begin >= elf2_begin and elf1_begin <= elf2_end -> 1
+    elf1_end   >= elf2_begin and elf1_end   <= elf2_end -> 1
+
+    elf2_begin >= elf1_begin and elf2_begin <= elf1_end -> 1
+    elf2_end   >= elf1_begin and elf2_end   <= elf1_end -> 1
+
+    true -> 0
+  end
+end
+
 input_sequence = input_content        |>
                  String.trim()        |>
                  String.split("\n")   |>
                  Enum.map(parse_line)
 
-# IO.inspect(input_sequence, label: "Input Sequence")
-
 part1_input = input_sequence |>
               Enum.map(fully_contains?)
 
-# IO.inspect(input_sequence, label: "Part1 Input")
+part2_input = input_sequence |>
+              Enum.map(overlaps?)
+
+# IO.inspect(input_sequence, label: "Input Sequence")
+# IO.inspect(part1_input, label: "Part1 Input")
+# IO.inspect(part2_input, label: "Part2 Input")
 
 # In how many assignment pairs does one range fully contain the other?
 IO.inspect(Enum.sum(part1_input), label: "Part1 Result")
+IO.inspect(Enum.sum(part2_input), label: "Part1 Result")
