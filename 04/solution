@@ -44,4 +44,6 @@ part2_input = Enum.map(input_sequence, overlaps?)
 
 # In how many assignment pairs does one range fully contain the other?
 IO.inspect(Enum.sum(part1_input), label: "Part1 Result")
+
+# In how many assignment pairs do the ranges overlap?
 IO.inspect(Enum.sum(part2_input), label: "Part1 Result")
