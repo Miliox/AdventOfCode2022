@@ -1,0 +1,34 @@
+#! /usr/bin/env elixir
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+parse_line = fn line ->
+  String.split(line)                 |>
+  Enum.map(&(String.split(&1, ","))) |>
+  Enum.concat()                      |>
+  Enum.map(&(String.split(&1, "-"))) |>
+  Enum.concat()                      |>
+  Enum.map(&String.to_integer/1)
+end
+
+fully_contains? = fn [elf1_begin, elf1_end, elf2_begin, elf2_end] ->
+  cond do
+    elf1_begin >= elf2_begin and elf1_end <= elf2_end -> 1
+    elf2_begin >= elf1_begin and elf2_end <= elf1_end -> 1
+    true -> 0
+  end
+end
+
+input_sequence = input_content        |>
+                 String.trim()        |>
+                 String.split("\n")   |>
+                 Enum.map(parse_line)
+
+# IO.inspect(input_sequence, label: "Input Sequence")
+
+part1_input = input_sequence |>
+              Enum.map(fully_contains?)
+
+# IO.inspect(input_sequence, label: "Part1 Input")
+
+# In how many assignment pairs does one range fully contain the other?
+IO.inspect(Enum.sum(part1_input), label: "Part1 Result")
