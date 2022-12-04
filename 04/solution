@@ -35,11 +35,8 @@ input_sequence = input_content        |>
                  String.split("\n")   |>
                  Enum.map(parse_line)
 
-part1_input = input_sequence |>
-              Enum.map(fully_contains?)
-
-part2_input = input_sequence |>
-              Enum.map(overlaps?)
+part1_input = Enum.map(input_sequence, fully_contains?)
+part2_input = Enum.map(input_sequence, overlaps?)
 
 # IO.inspect(input_sequence, label: "Input Sequence")
 # IO.inspect(part1_input, label: "Part1 Input")
