@@ -38,18 +38,31 @@ crane_cmds = parse_crane_cmds.(crane_cmds)
 
 # IO.inspect(crane_cmds, label: "Commands")
 
-stacks = Enum.reduce(crane_cmds, stacks, fn [qtd, src, dst], stacks ->
-             src = src - 1
-             dst = dst - 1
+stacks_part1 = Enum.reduce(crane_cmds, stacks, fn [qtd, src, dst], stacks ->
+    src = src - 1
+    dst = dst - 1
 
-             {top, bottom} = Enum.split(elem(stacks, src), qtd)
-             dst_stack = Enum.reverse(top) ++ elem(stacks, dst)
+    {top, bottom} = Enum.split(elem(stacks, src), qtd)
+    dst_stack = Enum.reverse(top) ++ elem(stacks, dst)
 
-             stacks = put_elem(stacks, src, bottom)
-             stacks = put_elem(stacks, dst, dst_stack)
-             stacks
-         end)
+    stacks = put_elem(stacks, src, bottom)
+    stacks = put_elem(stacks, dst, dst_stack)
+    stacks
+end)
+
+stacks_part2 = Enum.reduce(crane_cmds, stacks, fn [qtd, src, dst], stacks ->
+    src = src - 1
+    dst = dst - 1
+
+    {top, bottom} = Enum.split(elem(stacks, src), qtd)
+    dst_stack = top ++ elem(stacks, dst)
+
+    stacks = put_elem(stacks, src, bottom)
+    stacks = put_elem(stacks, dst, dst_stack)
+    stacks
+end)
 
 # IO.inspect(stacks, label: "Stacks")
 
-Enum.map(Tuple.to_list(stacks), &(Enum.at(&1,0))) |> IO.inspect()
+Enum.map(Tuple.to_list(stacks_part1), &(Enum.at(&1,0))) |> IO.inspect(label: "Part1")
+Enum.map(Tuple.to_list(stacks_part2), &(Enum.at(&1,0))) |> IO.inspect(label: "Part2")
