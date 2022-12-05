@@ -1,0 +1,55 @@
+#! /usr/bin/env elixir
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+[sketch, crane_cmds] = String.split(input_content, "\n")   |>
+                       Enum.map(&String.to_charlist/1) |>
+                       Enum.chunk_by(&(&1 == [])) |>
+                       Enum.reject(&(&1 == [[]]))
+
+parse_sketch = fn lines ->
+  # Remove footer " 1  2 ..."
+  [_footer | lines]= Enum.reverse(lines)
+
+  lines = Enum.map(
+    Enum.reverse(lines),
+    &(Enum.slice(&1, 1..length(&1)//4)))
+
+  Enum.zip(lines) |>
+  Enum.map(&Tuple.to_list/1) |>
+  Enum.map(&(Enum.reject(&1, fn e -> e == ?\s end))) |>
+  List.to_tuple()
+end
+
+stacks = parse_sketch.(sketch)
+
+# IO.inspect(stacks, label: "Stacks")
+
+parse_crane_cmds = fn lines ->
+  Enum.map(lines, fn line ->
+      Enum.chunk_by(line, &(&1 == ?\s)) |>
+      Enum.reject(&(&1 == ' '))         |>
+      Enum.slice(1..5//2)               |>
+      Enum.map(&List.to_string/1)       |>
+      Enum.map(&String.to_integer/1)
+  end)
+end
+
+crane_cmds = parse_crane_cmds.(crane_cmds)
+
+# IO.inspect(crane_cmds, label: "Commands")
+
+stacks = Enum.reduce(crane_cmds, stacks, fn [qtd, src, dst], stacks ->
+             src = src - 1
+             dst = dst - 1
+
+             {top, bottom} = Enum.split(elem(stacks, src), qtd)
+             dst_stack = Enum.reverse(top) ++ elem(stacks, dst)
+
+             stacks = put_elem(stacks, src, bottom)
+             stacks = put_elem(stacks, dst, dst_stack)
+             stacks
+         end)
+
+# IO.inspect(stacks, label: "Stacks")
+
+Enum.map(Tuple.to_list(stacks), &(Enum.at(&1,0))) |> IO.inspect()
