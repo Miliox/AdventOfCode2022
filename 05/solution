@@ -1,68 +1,71 @@
 #! /usr/bin/env elixir
-{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
-
-[sketch, crane_cmds] = String.split(input_content, "\n")   |>
-                       Enum.map(&String.to_charlist/1) |>
-                       Enum.chunk_by(&(&1 == [])) |>
-                       Enum.reject(&(&1 == [[]]))
-
-parse_sketch = fn lines ->
+parse_stack_sketch = fn lines ->
   # Remove footer " 1  2 ..."
   [_footer | lines]= Enum.reverse(lines)
 
-  lines = Enum.map(
-    Enum.reverse(lines),
-    &(Enum.slice(&1, 1..length(&1)//4)))
+  letter_indexes = &(1..length(&1)//4)
+  extract_letters = &(Enum.slice(&1, letter_indexes.(&1)))
 
-  Enum.zip(lines) |>
+  space? = &(&1 == ?\s)
+  reject_spaces = &(Enum.reject(&1, space?))
+
+  # Convert Character Columns to Stacks
+  Enum.reverse(lines)        |>
+  Enum.map(extract_letters)  |>
+  Enum.zip()                 |> # Colums -> Stacks
   Enum.map(&Tuple.to_list/1) |>
-  Enum.map(&(Enum.reject(&1, fn e -> e == ?\s end))) |>
+  Enum.map(reject_spaces)    |>
   List.to_tuple()
 end
 
-stacks = parse_sketch.(sketch)
+parse_command = fn command ->
+    space? = &(&1 == ?\s)
+    separator_token? = &(&1 == ' ')
+    param_indexes = 1..5//2 # range [1, 3, 5]
 
-# IO.inspect(stacks, label: "Stacks")
-
-parse_crane_cmds = fn lines ->
-  Enum.map(lines, fn line ->
-      Enum.chunk_by(line, &(&1 == ?\s)) |>
-      Enum.reject(&(&1 == ' '))         |>
-      Enum.slice(1..5//2)               |>
-      Enum.map(&List.to_string/1)       |>
-      Enum.map(&String.to_integer/1)
-  end)
+    Enum.chunk_by(command, space?) |> # Tokenize
+    Enum.reject(separator_token?)  |>
+    Enum.slice(param_indexes)      |> # List of params
+    Enum.map(&List.to_string/1)    |>
+    Enum.map(&String.to_integer/1)
 end
 
-crane_cmds = parse_crane_cmds.(crane_cmds)
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
 
-# IO.inspect(crane_cmds, label: "Commands")
+[stack_sketch, commands] = String.split(input_content, "\n") |>
+                     Enum.map(&String.to_charlist/1)   |>
+                     Enum.chunk_by(&(&1 == []))        |>
+                     Enum.reject(&(&1 == [[]]))
 
-stacks_part1 = Enum.reduce(crane_cmds, stacks, fn [qtd, src, dst], stacks ->
+stacks = parse_stack_sketch.(stack_sketch)
+
+commands = Enum.map(commands, parse_command)
+
+stacks_part1 = Enum.reduce(commands, stacks, fn [qtd, src, dst], stacks ->
     src = src - 1
     dst = dst - 1
 
-    {top, bottom} = Enum.split(elem(stacks, src), qtd)
-    dst_stack = Enum.reverse(top) ++ elem(stacks, dst)
+    # CrateMover 9000
+    {crates, src_stack} = Enum.split(elem(stacks, src), qtd)
+    dst_stack = Enum.reverse(crates) ++ elem(stacks, dst)
 
-    stacks = put_elem(stacks, src, bottom)
+    stacks = put_elem(stacks, src, src_stack)
     stacks = put_elem(stacks, dst, dst_stack)
     stacks
 end)
 
-stacks_part2 = Enum.reduce(crane_cmds, stacks, fn [qtd, src, dst], stacks ->
+stacks_part2 = Enum.reduce(commands, stacks, fn [qtd, src, dst], stacks ->
     src = src - 1
     dst = dst - 1
 
-    {top, bottom} = Enum.split(elem(stacks, src), qtd)
-    dst_stack = top ++ elem(stacks, dst)
+    # CrateMover 9001
+    {crates, src_stack} = Enum.split(elem(stacks, src), qtd)
+    dst_stack = crates ++ elem(stacks, dst)
 
-    stacks = put_elem(stacks, src, bottom)
+    stacks = put_elem(stacks, src, src_stack)
     stacks = put_elem(stacks, dst, dst_stack)
     stacks
 end)
-
-# IO.inspect(stacks, label: "Stacks")
 
 Enum.map(Tuple.to_list(stacks_part1), &(Enum.at(&1,0))) |> IO.inspect(label: "Part1")
 Enum.map(Tuple.to_list(stacks_part2), &(Enum.at(&1,0))) |> IO.inspect(label: "Part2")
