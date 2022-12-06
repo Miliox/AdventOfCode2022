@@ -1,0 +1,38 @@
+#! /usr/bin/env elixir
+
+defmodule SignalProcessor do
+    defp all_unique?(c1, c2, c3, c4) do
+        # Faster to just compare than
+        # [c1, c2, c3, c4] |> Enum.sort() |> Enum.dedup() |> length() == 4
+        (c1 != c2 and c1 != c3 and c1 != c4) and
+        (c2 != c3 and c2 != c4) and
+        (c3 != c4)
+    end
+
+    def start_of_packet_index(signal) do
+        [ c1 | [ c2 | [ c3 | [ c4 | tail] ]]] = signal
+        start_of_packet_index(c1, c2, c3, c4, 4, tail)
+    end
+
+    def start_of_packet_index(c1, c2, c3, c4, index, []) do
+        case all_unique?(c1, c2, c3, c4) do
+             true  -> index
+             false -> :not_found
+        end
+    end
+
+    def start_of_packet_index(c1, c2, c3, c4, index, [c5 | tail]) do
+        case all_unique?(c1, c2, c3, c4) do
+             true  -> index
+             false -> start_of_packet_index(c2, c3, c4, c5, index + 1, tail)
+        end
+    end
+end
+
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+# Process as a list is easier
+input_content = String.to_charlist(input_content)
+
+IO.inspect(length(input_content), label: "Input Length")
+IO.inspect(SignalProcessor.start_of_packet_index(input_content), label: "Part 1?")
