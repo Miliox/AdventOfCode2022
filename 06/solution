@@ -1,30 +1,25 @@
 #! /usr/bin/env elixir
-
 defmodule SignalProcessor do
-    defp all_unique?(c1, c2, c3, c4) do
-        # Faster to just compare than
-        # [c1, c2, c3, c4] |> Enum.sort() |> Enum.dedup() |> length() == 4
-        (c1 != c2 and c1 != c3 and c1 != c4) and
-        (c2 != c3 and c2 != c4) and
-        (c3 != c4)
+    defp all_unique?(list) do
+        length(list) == Enum.sort(list) |> Enum.dedup() |> length()
     end
 
-    def start_of_packet_index(signal) do
-        [ c1 | [ c2 | [ c3 | [ c4 | tail] ]]] = signal
-        start_of_packet_index(c1, c2, c3, c4, 4, tail)
+    def start_of_packet_index(input_signal, header_length) do
+        {header, tail} = Enum.split(input_signal, header_length)
+        start_of_packet_index_loop(header, tail, header_length)
     end
 
-    def start_of_packet_index(c1, c2, c3, c4, index, []) do
-        case all_unique?(c1, c2, c3, c4) do
+    defp start_of_packet_index_loop(header, [], index) do
+        case all_unique?(header) do
              true  -> index
              false -> :not_found
         end
     end
-
-    def start_of_packet_index(c1, c2, c3, c4, index, [c5 | tail]) do
-        case all_unique?(c1, c2, c3, c4) do
+    defp start_of_packet_index_loop(old_header = [_ | new_header], [ symbol | signal ], index) do
+        new_header = new_header ++ [symbol]
+        case all_unique?(old_header) do
              true  -> index
-             false -> start_of_packet_index(c2, c3, c4, c5, index + 1, tail)
+             false -> start_of_packet_index_loop(new_header, signal, index + 1)
         end
     end
 end
@@ -35,4 +30,5 @@ end
 input_content = String.to_charlist(input_content)
 
 IO.inspect(length(input_content), label: "Input Length")
-IO.inspect(SignalProcessor.start_of_packet_index(input_content), label: "Part 1?")
+IO.inspect(SignalProcessor.start_of_packet_index(input_content, 4), label: "Part 1")
+IO.inspect(SignalProcessor.start_of_packet_index(input_content, 14), label: "Part 2")
