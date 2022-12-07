@@ -1,0 +1,39 @@
+#! /usr/bin/env elixir
+
+defmodule Solution do
+    def traverse([], _, dirs) do
+        dirs
+    end
+    def traverse([[ "$", "cd", "/" ]|cmds], _, dirs) do
+        traverse(cmds, ["/"], dirs)
+    end
+    def traverse([[ "$", "cd", ".."]|cmds], [_|path], dirs) do
+        traverse(cmds, path, dirs)
+    end
+    def traverse([[ "$", "cd", dir]|cmds], path, dirs) do
+        traverse(cmds, [dir|path], dirs)
+    end
+    def traverse([["$", "ls"]|cmds], path, dirs) do
+        traverse(cmds, path, [{Enum.reverse(path), 0}|dirs])
+    end
+    def traverse([["dir", _dir_name]|cmds], path, dirs) do
+        traverse(cmds, path, dirs)
+    end
+    def traverse([[file_size, _file_name]| cmds], path, [{dir_path, dir_size}|dirs]) do
+        file_size = String.to_integer(file_size)
+        traverse(cmds, path, [{dir_path, dir_size + file_size}|dirs])
+    end
+end
+
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+input_content =  input_content |>
+                 String.split("\n")  |>
+                 Enum.map(fn line -> String.split(line, " ") end)
+
+directories = Solution.traverse(input_content, [], [])
+
+# What is the sum of the total sizes of those directories?
+
+IO.inspect(input_content, label: "Input")
+IO.inspect(directories, label: "directories")
