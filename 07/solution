@@ -46,12 +46,20 @@ input_content =  input_content |>
 
 directories = Solution.traverse(input_content, [], %{})
 
-directory_sizes = Map.values(directories) |> Enum.sort() |> Enum.reverse()
+directory_sizes = Map.values(directories) |> Enum.sort()
 
-directory_sizes_below_limit = Enum.reject(directory_sizes, &(&1 > 100000))
+directory_sizes_below_limit = directory_sizes |> Enum.reverse() |> Enum.reject(&(&1 > 100000))
 
-IO.inspect(input_content, label: "Input")
-IO.inspect(directories, label: "directories")
+used_space = directory_sizes |> Enum.reverse() |> Enum.at(0)
+
+unused_space = 70000000 - used_space
+
+needed_space = 30000000 - unused_space
+
+directory_to_delete = directory_sizes |> Enum.find(&(&1 >=needed_space))
+
+IO.inspect(needed_space, label: "Needed Space")
 
 # What is the sum of the total sizes of those directories?
 IO.inspect(Enum.sum(directory_sizes_below_limit), label: "directories")
+IO.inspect(directory_to_delete, label: "directory to delete")
