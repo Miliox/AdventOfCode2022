@@ -1,46 +1,42 @@
 #! /usr/bin/env elixir
 
 defmodule Solution do
-    def traverse([], _, dirs) do
-        # Do from leaves to root keep everything correct
+    def traverse(cmds) do
+        # Mount directory structure
+        {_, dirs} = Enum.reduce(cmds, {[], %{}}, fn
+            [ "$", "cd", ".."], {cwd, dirs} ->
+                [_ | cwd] = cwd
+                {cwd, dirs}
+            [ "$", "cd", "/" ], {_, dirs} ->
+                cwd  = ["/"]
+                dirs = Map.put_new(dirs, cwd, 0)
+                {cwd, dirs}
+            [ "$", "cd",  dir], {cwd, dirs} ->
+                cwd  = [dir | cwd]
+                dirs = Map.put_new(dirs, cwd, 0)
+                {cwd, dirs}
+            ["$", "ls"], {cwd, dirs} -> {cwd, dirs}
+            ["dir",  _], {cwd, dirs} -> {cwd, dirs}
+            [file_size, _file_name], {cwd, dirs} ->
+                # update directory size
+                {:ok, dir_size} = Map.fetch(dirs, cwd)
+                dir_size = dir_size + String.to_integer(file_size)
+                dirs = Map.put(dirs, cwd, dir_size)
+
+                {cwd, dirs}
+        end)
+
+        # Do from leaves to root to keep everything correct
         paths = Map.keys(dirs) |> Enum.sort(&(length(&1) >= length(&2)))
 
-        # Add child directory size of parent directory
-        Enum.reduce(paths, dirs,
-            fn child = [_| parent], dirs ->
-                {:ok, child_size}  = Map.fetch(dirs, child)
-                case Map.fetch(dirs, parent) do
-                    {:ok, parent_size} -> Map.put(dirs, parent, parent_size + child_size)
-                    :error             -> dirs
-                end
-            end)
-    end
-    def traverse([[ "$", "cd", "/" ]|cmds], _, dirs) do
-        traverse(cmds, ["/"], dirs)
-    end
-    def traverse([[ "$", "cd", ".."]|cmds], [_|path], dirs) do
-        traverse(cmds, path, dirs)
-    end
-    def traverse([[ "$", "cd", dir]|cmds], path, dirs) do
-        path = [dir|path]
-        traverse(cmds, path, dirs)
-    end
-    def traverse([["$", "ls"]|cmds], path, dirs) do
-        dirs = Map.put_new(dirs, path, 0)
-        traverse(cmds, path, dirs)
-    end
-    def traverse([["dir", _]|cmds], path, dirs) do
-        traverse(cmds, path, dirs)
-    end
-    def traverse([[file_size, _]| cmds], path, dirs) do
-        file_size = String.to_integer(file_size)
-
-        # update directory size
-        {:ok, dir_size} = Map.fetch(dirs, path)
-        dir_size = dir_size + file_size
-        dirs = Map.put(dirs, path, dir_size)
-
-        traverse(cmds, path, dirs)
+        # Add child directory size to parent directory size
+        Enum.reduce(paths, dirs, fn child = [_| parent], dirs ->
+            {:ok, child_size}  = Map.fetch(dirs, child)
+            case Map.fetch(dirs, parent) do
+                {:ok, parent_size} -> Map.put(dirs, parent, parent_size + child_size)
+                :error  -> dirs
+            end
+        end)
     end
 end
 
@@ -48,7 +44,7 @@ end
 
 commands = String.split(input_content, "\n")  |> Enum.map(&(String.split(&1, " ")))
 
-directories = Solution.traverse(commands, [], %{})
+directories = Solution.traverse(commands)
 
 # Sorted to make next operations easier
 directory_sizes = Enum.sort(Map.values(directories))
