@@ -2,15 +2,18 @@
 
 defmodule Solution do
     def traverse([], _, dirs) do
+        # Do from leaves to root keep everything correct
         paths = Map.keys(dirs) |> Enum.sort(&(length(&1) >= length(&2)))
+
+        # Add child directory size of parent directory
         Enum.reduce(paths, dirs,
-        fn child = [_| parent], dirs ->
-            {:ok, child_size}  = Map.fetch(dirs, child)
-            case Map.fetch(dirs, parent) do
-                {:ok, parent_size} -> Map.put(dirs, parent, parent_size + child_size)
-                :error             -> dirs
-            end
-        end)
+            fn child = [_| parent], dirs ->
+                {:ok, child_size}  = Map.fetch(dirs, child)
+                case Map.fetch(dirs, parent) do
+                    {:ok, parent_size} -> Map.put(dirs, parent, parent_size + child_size)
+                    :error             -> dirs
+                end
+            end)
     end
     def traverse([[ "$", "cd", "/" ]|cmds], _, dirs) do
         traverse(cmds, ["/"], dirs)
@@ -26,40 +29,39 @@ defmodule Solution do
         dirs = Map.put_new(dirs, path, 0)
         traverse(cmds, path, dirs)
     end
-    def traverse([["dir", _dir_name]|cmds], path, dirs) do
+    def traverse([["dir", _]|cmds], path, dirs) do
         traverse(cmds, path, dirs)
     end
-    def traverse([[file_size, _file_name]| cmds], path, dirs) do
+    def traverse([[file_size, _]| cmds], path, dirs) do
         file_size = String.to_integer(file_size)
+
+        # update directory size
         {:ok, dir_size} = Map.fetch(dirs, path)
         dir_size = dir_size + file_size
         dirs = Map.put(dirs, path, dir_size)
+
         traverse(cmds, path, dirs)
     end
 end
 
 {:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
 
-input_content =  input_content |>
-                 String.split("\n")  |>
-                 Enum.map(fn line -> String.split(line, " ") end)
+commands = String.split(input_content, "\n")  |> Enum.map(&(String.split(&1, " ")))
 
-directories = Solution.traverse(input_content, [], %{})
+directories = Solution.traverse(commands, [], %{})
 
-directory_sizes = Map.values(directories) |> Enum.sort()
+# Sorted to make next operations easier
+directory_sizes = Enum.sort(Map.values(directories))
 
-directory_sizes_below_limit = directory_sizes |> Enum.reverse() |> Enum.reject(&(&1 > 100000))
-
-used_space = directory_sizes |> Enum.reverse() |> Enum.at(0)
-
-unused_space = 70000000 - used_space
-
-needed_space = 30000000 - unused_space
-
-directory_to_delete = directory_sizes |> Enum.find(&(&1 >=needed_space))
-
-IO.inspect(needed_space, label: "Needed Space")
-
+# Find all of the directories with a total size of at most 100000.
 # What is the sum of the total sizes of those directories?
-IO.inspect(Enum.sum(directory_sizes_below_limit), label: "directories")
-IO.inspect(directory_to_delete, label: "directory to delete")
+part1 = Enum.reject(directory_sizes, &(&1 > 100000)) |> Enum.sum()
+
+# Find the smallest directory that, if deleted, would free up enough
+# space on the filesystem to run the update.
+# What is the total size of that directory?
+req_space = 30000000 - (70000000 - Enum.at(directory_sizes, -1))
+part2 = Enum.find(directory_sizes, &(&1 >= req_space))
+
+IO.inspect(part1, label: "Part1")
+IO.inspect(part2, label: "Part2")
