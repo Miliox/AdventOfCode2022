@@ -12,7 +12,7 @@ decode_glyph = fn glyph -> glyph - ?0 end
              {Enum.map(row, fn {v, x} -> {x, y, v} end), y + 1}
             end)
 
-defmodule Solution do
+defmodule SolutionPart1 do
     def list_visible_trees(grid) do
         # Scan from West to East
         visible_trees = Enum.map(grid, &list_visible_trees_in_line/1) |> Enum.concat()
@@ -26,13 +26,13 @@ defmodule Solution do
         # Convert Rows to Columns
         grid = Enum.zip(grid) |> Enum.map(&Tuple.to_list/1)
 
-        # Scan from South to North
+        # Scan from North to South
         visible_trees = visible_trees ++ (Enum.map(grid, &list_visible_trees_in_line/1) |> Enum.concat())
 
-        # Flip South/North
+        # Flip North/South
         grid = Enum.map(grid, &Enum.reverse/1)
 
-        # Scan from North to South
+        # Scan from South to North
         visible_trees = visible_trees ++ (Enum.map(grid, &list_visible_trees_in_line/1) |> Enum.concat())
 
         # Deduplicate entries
@@ -59,9 +59,97 @@ defmodule Solution do
     end
 end
 
-visible_trees = Solution.list_visible_trees(grid)
+visible_trees = SolutionPart1.list_visible_trees(grid)
 
 visible_trees_count = length(visible_trees)
 
 # Consider your map; how many trees are visible from outside the grid?
 IO.inspect(visible_trees_count, label: "Part1")
+
+defmodule SolutionPart2 do
+    def max_scenic_score(grid) do
+        # Extract x,y coordinates
+        coords = Enum.concat(grid) |> Enum.map(fn {x, y, _} -> {x , y} end)
+
+        # Convert List of Lists to Tuple of Tuples for faster access
+        grid = grid |> Enum.map(fn row -> List.to_tuple(row) end) |> List.to_tuple()
+        y_len = tuple_size(grid)
+        x_len = tuple_size(elem(grid, 0))
+
+        procs = Enum.map(coords, fn {x,y} ->
+            spawn(SolutionPart2, :calculate_scenic_score, [self(), x, x_len, y, y_len, grid])
+        end)
+
+        results = Enum.map(procs, fn child ->
+            receive do
+                {^child, score} -> score
+            end
+        end)
+
+        Enum.max(results)
+    end
+
+    defp tree_height_at(x, y, grid) do
+        {^x, ^y, h} = elem(elem(grid, y), x)
+        h
+    end
+
+    def calculate_scenic_score(parent, x, x_len, y, y_len, grid) do
+        base = tree_height_at(x, y, grid)
+        w = west_score(x-1,          y,        grid, base, 0)
+        e = east_score(x+1, x_len,   y,        grid, base, 0)
+        n = north_score(x,         y-1,        grid, base, 0)
+        s = south_score(x,         y+1, y_len, grid, base, 0)
+        send(parent, {self(), w * e * n * s})
+    end
+
+    defp west_score(-1, _y, _grid, _base_tree_height, score) do
+        score
+    end
+    defp west_score(x, y, grid, base_tree_height, score) do
+        target_height = tree_height_at(x, y, grid)
+        cond do
+            target_height == 9                -> score + 1
+            target_height >= base_tree_height -> score + 1
+            true                              -> west_score(x-1, y, grid, base_tree_height, score + 1)
+        end
+    end
+
+    defp east_score(x_len, x_len, _y, _grid, _base_tree_height, score) do
+        score
+    end
+    defp east_score(x, x_len, y, grid, base_tree_height, score) do
+        target_height = tree_height_at(x, y, grid)
+        cond do
+            target_height == 9                -> score + 1
+            target_height >= base_tree_height -> score + 1
+            true                              -> east_score(x+1, x_len, y, grid, base_tree_height, score + 1)
+        end
+    end
+
+    defp north_score(_, -1, _grid, _base_tree_height, score) do
+        score
+    end
+    defp north_score(x, y, grid, base_tree_height, score) do
+        target_height = tree_height_at(x, y, grid)
+        cond do
+            target_height == 9                -> score + 1
+            target_height >= base_tree_height -> score + 1
+            true                              -> north_score(x, y-1, grid, base_tree_height, score + 1)
+        end
+    end
+
+    defp south_score(_, y_len, y_len, _grid, _base_tree_height, score) do
+        score
+    end
+    defp south_score(x, y, y_len, grid, base_tree_height, score) do
+        target_height = tree_height_at(x, y, grid)
+        cond do
+            target_height == 9                -> score + 1
+            target_height >= base_tree_height -> score + 1
+            true                              -> south_score(x, y+1, y_len, grid, base_tree_height, score + 1)
+        end
+    end
+end
+
+IO.inspect(SolutionPart2.max_scenic_score(grid), label: "Part2")
