@@ -1,0 +1,67 @@
+#! /usr/bin/env elixir
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+decode_glyph = fn glyph -> glyph - ?0 end
+
+# Generate annotated grid of {xpos, ypos, value} to handle rotations
+{grid, _} = String.split(input_content, "\n") |>
+            Enum.map(&String.to_charlist/1)   |>
+            Enum.map(fn row -> Enum.map(row, decode_glyph) end) |>
+            Enum.map(fn row -> Enum.with_index(row) end) |>
+            Enum.map_reduce(0, fn row, y ->
+             {Enum.map(row, fn {v, x} -> {x, y, v} end), y + 1}
+            end)
+
+defmodule Solution do
+    def list_visible_trees(grid) do
+        # Scan from West to East
+        visible_trees = Enum.map(grid, &list_visible_trees_in_line/1) |> Enum.concat()
+
+        # Flip West/East
+        grid = Enum.map(grid, &Enum.reverse/1)
+
+        # Scan from East to West
+        visible_trees = visible_trees ++ (Enum.map(grid, &list_visible_trees_in_line/1) |> Enum.concat())
+
+        # Convert Rows to Columns
+        grid = Enum.zip(grid) |> Enum.map(&Tuple.to_list/1)
+
+        # Scan from South to North
+        visible_trees = visible_trees ++ (Enum.map(grid, &list_visible_trees_in_line/1) |> Enum.concat())
+
+        # Flip South/North
+        grid = Enum.map(grid, &Enum.reverse/1)
+
+        # Scan from North to South
+        visible_trees = visible_trees ++ (Enum.map(grid, &list_visible_trees_in_line/1) |> Enum.concat())
+
+        # Deduplicate entries
+        visible_trees = MapSet.new(visible_trees) |> MapSet.to_list()
+
+        visible_trees
+    end
+
+    def list_visible_trees_in_line(tree_line) do
+        list_visible_trees_in_line(tree_line, -1, [])
+    end
+
+    defp list_visible_trees_in_line([], _, tree_list) do
+        tree_list
+    end
+    defp list_visible_trees_in_line(_, 9, tree_list) do
+        tree_list
+    end
+    defp list_visible_trees_in_line([tree = {_, _, height} | tree_line], prev_heighest, tree_list) when height > prev_heighest do
+        list_visible_trees_in_line(tree_line, height, [tree | tree_list])
+    end
+    defp list_visible_trees_in_line([_| tree_line], prev_heighest, tree_list) do
+        list_visible_trees_in_line(tree_line, prev_heighest, tree_list)
+    end
+end
+
+visible_trees = Solution.list_visible_trees(grid)
+
+visible_trees_count = length(visible_trees)
+
+# Consider your map; how many trees are visible from outside the grid?
+IO.inspect(visible_trees_count, label: "Part1")
