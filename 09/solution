@@ -1,0 +1,72 @@
+#! /usr/bin/env elixir
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+route = String.split(input_content, "\n")     |>
+        Enum.map(fn s -> String.split(s, " ") |>
+        Enum.map(&String.to_charlist/1) end)  |>
+        Enum.map(&List.to_tuple/1)
+
+# IO.inspect(route, label: "Route")
+
+defmodule SolutionPart1 do
+    def traverse(route) do
+        start = {0, 0}
+        traverse(route, start, start, MapSet.new([start]))
+    end
+
+    defp traverse([], _, _, visited) do
+        visited
+    end
+    defp traverse([{dir, steps}|route], {hx, hy}, tail, visited) do
+        steps = List.to_integer(steps)
+        {dx, dy} = case dir do
+            'U' -> {0, -steps}
+            'D' -> {0, +steps}
+            'L' -> {-steps, 0}
+            'R' -> {+steps, 0}
+        end
+        head = {hx + dx, hy + dy}
+
+        {tail, visited} = follow(head, tail, visited)
+
+        traverse(route, head, tail, visited)
+    end
+
+    defp follow({hx, hy}, {tx, ty}, visited) when abs(hx - tx) <= 1 and abs(hy - ty) <= 1 do
+        {{tx, ty}, visited}
+    end
+    defp follow(head = {hx, hy}, {tx, ty}, visited) when hx > tx and hy > ty do
+        tail = {tx + 1, ty + 1}
+        follow(head, tail, MapSet.put(visited, tail))
+    end
+    defp follow(head = {hx, hy}, {tx, ty}, visited) when hx < tx and hy > ty do
+        tail = {tx - 1, ty + 1}
+        follow(head, tail, MapSet.put(visited, tail))
+    end
+    defp follow(head = {hx, hy}, {tx, ty}, visited) when hx > tx and hy < ty do
+        tail = {tx + 1, ty - 1}
+        follow(head, tail, MapSet.put(visited, tail))
+    end
+    defp follow(head = {hx, hy}, {tx, ty}, visited) when hx < tx and hy < ty do
+        tail = {tx - 1, ty - 1}
+        follow(head, tail, MapSet.put(visited, tail))
+    end
+    defp follow(head = {hx, _}, {tx, ty}, visited) when hx > tx do
+        tail = {tx + 1, ty}
+        follow(head, tail, MapSet.put(visited, tail))
+    end
+    defp follow(head = {hx, _}, {tx, ty}, visited) when hx < tx do
+        tail = {tx - 1, ty}
+        follow(head, tail, MapSet.put(visited, tail))
+    end
+    defp follow(head = {_, hy}, {tx, ty}, visited) when hy > ty do
+        tail = {tx, ty + 1}
+        follow(head, tail, MapSet.put(visited, tail))
+    end
+    defp follow(head = {_, hy}, {tx, ty}, visited) when hy < ty do
+        tail = {tx, ty - 1}
+        follow(head, tail, MapSet.put(visited, tail))
+    end
+end
+
+IO.inspect(SolutionPart1.traverse(route) |> MapSet.size(), label: "Route")
