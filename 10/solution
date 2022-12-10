@@ -1,17 +1,17 @@
 #! /usr/bin/env elixir
 {:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
 
-delta_x_per_cycle = String.split(input_content, "\n")     |>
-                    Enum.map(fn line ->
-                        case String.split(line, " ") do
-                            ["noop"]      -> [0]
-                            ["addx", val] -> [0, String.to_integer(val)]
-                        end
-                     end) |> Enum.concat()
+dx_per_cycle = String.split(input_content, "\n")     |>
+               Enum.map(fn line ->
+                   case String.split(line, " ") do
+                       ["noop"]      -> [0]
+                       ["addx", val] -> [0, String.to_integer(val)]
+                   end
+               end) |> Enum.concat()
 
 start_x = 1
 
-{x_per_cycle, _final_x} = Enum.map_reduce(delta_x_per_cycle, start_x, fn delta, x -> {x + delta, x + delta} end)
+{x_per_cycle, _final_x} = Enum.map_reduce(dx_per_cycle, start_x, fn delta, x -> {x + delta, x + delta} end)
 
 # Adjustment, so nth value is the value of x at that cycle before the instruction have executed
 x_per_cycle = [start_x | [start_x | x_per_cycle]]
@@ -21,6 +21,21 @@ cycles_of_interest = [20, 60, 100, 140, 180, 220]
 x_of_interest = Enum.map(cycles_of_interest, &(Enum.at(x_per_cycle, &1)))
 x_strength_of_interest = Enum.map(cycles_of_interest, &(&1 * Enum.at(x_per_cycle, &1)))
 
-IO.inspect(x_of_interest, label: 'Part1 - X')
-IO.inspect(x_strength_of_interest, label: 'Part1 - Signal Strength')
-IO.inspect(Enum.sum(x_strength_of_interest), label: 'Part1 - Signal Strength Sum')
+IO.puts("Part1 - Signal Strength (SS)")
+IO.inspect(x_of_interest, label: 'X')
+IO.inspect(x_strength_of_interest, label: 'SS')
+IO.inspect(Enum.sum(x_strength_of_interest), label: 'SS Sum')
+
+scanlines = Enum.map(1..240, fn pos ->
+                xpos = rem(pos - 1, 40)
+                xval = Enum.at(x_per_cycle, pos)
+                cond do
+                    xpos == xval-1 -> ?#
+                    xpos == xval   -> ?#
+                    xpos == xval+1 -> ?#
+                    true           -> ?.
+                end
+            end) |> Enum.chunk_every(40)
+
+IO.puts("Part2 - Scanlines")
+IO.inspect(scanlines)
