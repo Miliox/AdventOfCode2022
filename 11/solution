@@ -1,0 +1,83 @@
+#! /usr/bin/env elixir
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+monkey_pattern = "Monkey (\\d+):
+  Starting items: (\\d+[, \\d+]*)
+  Operation: (.*)
+  Test: divisible by (\\d+)
+    If true: throw to monkey (\\d+)
+    If false: throw to monkey (\\d+)
+"
+
+{:ok, monkey_regex} = Regex.compile(monkey_pattern)
+
+monkeys = Regex.scan(monkey_regex, input_content)
+
+monkeys = Enum.map(monkeys, fn [_, id, items, oper, test, true_to, false_to] ->
+    id    = String.to_integer(id)
+    items = items |> String.split(", ") |> Enum.map(&String.to_integer/1)
+    oper  = case String.split(oper, " ") do
+        ["new", "=", "old", "*", "old"] ->
+            fn old -> old * old end
+        ["new", "=", "old", "+", num] ->
+            num = String.to_integer(num)
+            fn old -> old + num end
+        ["new", "=", "old", "*", num] ->
+            num = String.to_integer(num)
+            fn old -> old * num end
+    end
+    test     = String.to_integer(test)
+    true_to  = String.to_integer(true_to)
+    false_to = String.to_integer(false_to)
+    {id, items, oper, test, true_to, false_to, 0}
+end)
+
+defmodule Solution do
+    @idx_items 1
+    @idx_inspected 6
+
+    def round(monkeys) do
+        round(monkeys, 0)
+    end
+
+    defp round(monkeys, index) when index >= tuple_size(monkeys) do
+        monkeys
+    end
+    defp round(monkeys, index) do
+        # Retrieve monkey
+        monkey = elem(monkeys, index)
+        {^index, items, oper, test, pass_idx, fail_idx, inspected} = monkey
+
+        # Update monkey state with empty items and inspected total
+        monkey = put_elem(monkey, @idx_items, [])
+        monkey = put_elem(monkey,  @idx_inspected, length(items) + inspected)
+        monkeys = put_elem(monkeys, index, monkey)
+
+        # Dispatch items
+        items = Enum.map(items, oper) |> Enum.map(&(div(&1, 3)))
+        pass_items = Enum.filter(items, &(rem(&1, test) == 0))
+        fail_items = Enum.reject(items, &(rem(&1, test) == 0))
+
+        pass_monkey = elem(monkeys, pass_idx)
+        pass_monkey_items = elem(pass_monkey, @idx_items) ++ pass_items
+        pass_monkey = put_elem(pass_monkey, @idx_items, pass_monkey_items)
+        monkeys = put_elem(monkeys, pass_idx, pass_monkey)
+
+        fail_monkey = elem(monkeys, fail_idx)
+        fail_monkey_items = elem(fail_monkey, @idx_items) ++ fail_items
+        fail_monkey = put_elem(fail_monkey, @idx_items, fail_monkey_items)
+        monkeys = put_elem(monkeys, fail_idx, fail_monkey)
+
+        round(monkeys, index + 1)
+    end
+end
+
+monkeys = List.to_tuple(monkeys)
+monkeys = Enum.reduce(1..20, monkeys, fn _, ms -> Solution.round(ms) end)
+monkeys = Tuple.to_list(monkeys)
+
+sorted_inspected_total = Enum.map(monkeys, &(elem(&1, 6))) |> Enum.sort()
+
+monkey_business = Enum.fetch!(sorted_inspected_total, -1) * Enum.fetch!(sorted_inspected_total, -2)
+
+IO.inspect(monkey_business, label: "Monkey Business")
