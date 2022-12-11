@@ -54,7 +54,10 @@ defmodule Solution do
         monkeys = put_elem(monkeys, index, monkey)
 
         # Dispatch items
-        items = Enum.map(items, oper) |> Enum.map(&(div(&1, 3)))
+        items = Enum.map(items, oper)
+            |> Enum.map(&(rem(&1, 5 * 7 * 13 * 11 * 3 * 2 * 17 * 19)))
+            # |> Enum.map(&(rem(&1, 23 * 19 * 13 * 17)))
+            # |> Enum.map(&(div(&1, 3)))
         pass_items = Enum.filter(items, &(rem(&1, test) == 0))
         fail_items = Enum.reject(items, &(rem(&1, test) == 0))
 
@@ -73,10 +76,10 @@ defmodule Solution do
 end
 
 monkeys = List.to_tuple(monkeys)
-monkeys = Enum.reduce(1..20, monkeys, fn _, ms -> Solution.round(ms) end)
+monkeys = Enum.reduce(1..10000, monkeys, fn _, ms -> Solution.round(ms) end)
 monkeys = Tuple.to_list(monkeys)
 
-sorted_inspected_total = Enum.map(monkeys, &(elem(&1, 6))) |> Enum.sort()
+sorted_inspected_total = Enum.map(monkeys, &(elem(&1, 6))) |> IO.inspect(char_list: :as_list) |> Enum.sort()
 
 monkey_business = Enum.fetch!(sorted_inspected_total, -1) * Enum.fetch!(sorted_inspected_total, -2)
 
