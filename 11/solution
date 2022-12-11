@@ -36,28 +36,22 @@ defmodule Solution do
     @idx_items 1
     @idx_inspected 6
 
-    def round(monkeys) do
-        round(monkeys, 0)
+    def round(monkeys, relief) do
+        round(monkeys, relief, 0)
     end
 
-    defp round(monkeys, index) when index >= tuple_size(monkeys) do
+    defp round(monkeys, _relief, index) when index >= tuple_size(monkeys) do
         monkeys
     end
-    defp round(monkeys, index) do
-        # Retrieve monkey
+    defp round(monkeys, relief, index) do
         monkey = elem(monkeys, index)
         {^index, items, oper, test, pass_idx, fail_idx, inspected} = monkey
 
-        # Update monkey state with empty items and inspected total
         monkey = put_elem(monkey, @idx_items, [])
         monkey = put_elem(monkey,  @idx_inspected, length(items) + inspected)
         monkeys = put_elem(monkeys, index, monkey)
 
-        # Dispatch items
-        items = Enum.map(items, oper)
-            |> Enum.map(&(rem(&1, 5 * 7 * 13 * 11 * 3 * 2 * 17 * 19)))
-            # |> Enum.map(&(rem(&1, 23 * 19 * 13 * 17)))
-            # |> Enum.map(&(div(&1, 3)))
+        items = Enum.map(items, oper) |> Enum.map(&(relief.(&1)))
         pass_items = Enum.filter(items, &(rem(&1, test) == 0))
         fail_items = Enum.reject(items, &(rem(&1, test) == 0))
 
@@ -71,16 +65,24 @@ defmodule Solution do
         fail_monkey = put_elem(fail_monkey, @idx_items, fail_monkey_items)
         monkeys = put_elem(monkeys, fail_idx, fail_monkey)
 
-        round(monkeys, index + 1)
+        round(monkeys, relief, index + 1)
+    end
+
+    def business(monkeys) do
+        total_inspected_sorted = Tuple.to_list(monkeys) |> Enum.map(&(elem(&1, 6))) |> Enum.sort() |> Enum.reverse()
+        Enum.fetch!(total_inspected_sorted, 0) * Enum.fetch!(total_inspected_sorted, 1)
     end
 end
 
+common_denominator = monkeys |> Enum.map(&(elem(&1, 3))) |> Enum.product()
+
+relief_part1 = &(div(&1, 3))
+relief_part2 = &(rem(&1, common_denominator))
+
 monkeys = List.to_tuple(monkeys)
-monkeys = Enum.reduce(1..10000, monkeys, fn _, ms -> Solution.round(ms) end)
-monkeys = Tuple.to_list(monkeys)
+monkeys_part1 = Enum.reduce(1..20, monkeys, fn _, ms -> Solution.round(ms, relief_part1) end)
+monkeys_part2 = Enum.reduce(1..10000, monkeys, fn _, ms -> Solution.round(ms, relief_part2) end)
 
-sorted_inspected_total = Enum.map(monkeys, &(elem(&1, 6))) |> IO.inspect(char_list: :as_list) |> Enum.sort()
-
-monkey_business = Enum.fetch!(sorted_inspected_total, -1) * Enum.fetch!(sorted_inspected_total, -2)
-
-IO.inspect(monkey_business, label: "Monkey Business")
+IO.puts("Monkey Business")
+IO.inspect(Solution.business(monkeys_part1), label: "Part1")
+IO.inspect(Solution.business(monkeys_part2), label: "Part2")
