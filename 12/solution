@@ -1,0 +1,39 @@
+#! /usr/bin/env elixir
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+input_grid = String.split(input_content, "\n") |>
+             Enum.map(&String.to_charlist/1) |>
+             Enum.map(&List.to_tuple/1) |>
+             List.to_tuple()
+
+dimensions = {tuple_size(elem(input_grid, 0)), tuple_size(input_grid)}
+
+defmodule Solution do
+    def find(symbol, grid) do
+        {x_len, y_len} = {tuple_size(elem(grid, 0)), tuple_size(grid)}
+        find(symbol, grid, 0, x_len, 0, y_len)
+    end
+
+    defp find(_, _, _, _, y_len, y_len) do
+        :error    
+    end
+    defp find(symbol, grid, x_len, x_len, y, y_len) do
+        find(symbol, grid, 0, x_len, y + 1, y_len)
+    end
+    defp find(symbol, grid, x, x_len, y, y_len) do
+        case elem(elem(grid, y), x) do
+            ^symbol -> {:ok, {x, y}}
+            _       -> find(symbol, grid, x + 1, x_len, y, y_len)
+        end
+    end
+end
+
+start  = Solution.find(?S, input_grid)
+ending = Solution.find(?E, input_grid)
+
+IO.inspect(input_grid, label: "Grid")
+IO.inspect(dimensions, label: "Dimensions")
+IO.inspect(start, label: "Start")
+IO.inspect(ending, label: "End")
+
+visited_nodes_table = :ets.new(:visited_nodes, [:set, :public, :named_table]) |> IO.inspect()
