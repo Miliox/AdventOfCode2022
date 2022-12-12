@@ -1,39 +1,106 @@
 #! /usr/bin/env elixir
 {:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
 
-input_grid = String.split(input_content, "\n") |>
-             Enum.map(&String.to_charlist/1) |>
-             Enum.map(&List.to_tuple/1) |>
-             List.to_tuple()
+grid = String.split(input_content, "\n") |> Enum.map(&String.to_charlist/1)
 
-dimensions = {tuple_size(elem(input_grid, 0)), tuple_size(input_grid)}
+find_pos = fn e ->
+    {Enum.find_index(Enum.map(Enum.zip(grid), &Tuple.to_list/1),
+        fn col -> Enum.find_index(col, &(&1 == e)) end),
+     Enum.find_index(grid,
+        fn row -> Enum.find_index(row, &(&1 == e)) end)}
+end
+
+from = find_pos.(?S) |> IO.inspect()
+to   = find_pos.(?E) |> IO.inspect()
+
+grid = Enum.map(grid,
+    fn row -> Enum.map(row,
+        fn e ->
+            case e do
+                ?S -> ?a - ?a
+                ?E -> ?z - ?a
+                _  ->  e - ?a
+            end
+        end)
+    end) |> Enum.map(&List.to_tuple/1) |> List.to_tuple()
+
+y_len = tuple_size(grid)
+x_len = tuple_size(elem(grid, 0))
+
+:visited = :ets.new(:visited, [:set, :private, :named_table])
+:ets.insert_new(:visited, {from, nil})
 
 defmodule Solution do
-    def find(symbol, grid) do
-        {x_len, y_len} = {tuple_size(elem(grid, 0)), tuple_size(grid)}
-        find(symbol, grid, 0, x_len, 0, y_len)
+    @grid  grid
+    @from  from
+    @to    to
+    @x_len x_len
+    @y_len y_len
+    @table :visited
+
+    def dijkstra([]) do
+        :not_found
+    end
+    def dijkstra([@to|_]) do
+        backtrace(@to, [])
+    end
+    def dijkstra([node|nodes]) do
+        adjs = adjacents(node)
+        dijkstra(nodes ++ adjs)
     end
 
-    defp find(_, _, _, _, y_len, y_len) do
-        :error    
+    defp adjacents(node = {x, y}) do
+        node_elev = elem(elem(@grid, y), x)
+
+        adjs = [{x, y-1}, {x, y+1}, {x-1, y}, {x+1,y}]
+        adjs = Enum.reject(adjs,
+            fn {ax, ay} ->
+                ax < 0 or ay < 0 or ax >= @x_len or ay >= @y_len
+            end)
+        adjs = Enum.reject(adjs,
+            fn {ax, ay} ->
+                adj_elev = elem(elem(@grid, ay), ax)
+
+                # Jump from high elevantion is fine, even if could break someone's legs
+                (adj_elev - node_elev) > 1
+            end)
+        adjs = Enum.reject(adjs, fn a -> :ets.member(@table, a) end)
+
+        # visit
+        Enum.map(adjs, fn a -> :ets.insert_new(@table, {a, node}) end)
+
+        adjs
     end
-    defp find(symbol, grid, x_len, x_len, y, y_len) do
-        find(symbol, grid, 0, x_len, y + 1, y_len)
+
+    defp backtrace(node, path) do
+        case :ets.lookup_element(@table, node, 2) do
+           nil    -> path
+           parent -> backtrace(parent, [parent|path])
+        end
     end
-    defp find(symbol, grid, x, x_len, y, y_len) do
-        case elem(elem(grid, y), x) do
-            ^symbol -> {:ok, {x, y}}
-            _       -> find(symbol, grid, x + 1, x_len, y, y_len)
+
+    def find_bases(_, @y_len, result) do
+        Enum.reverse(result)
+    end
+    def find_bases(@x_len, y, result) do
+        find_bases(0, y+1, result)
+    end
+    def find_bases(x, y, result) do
+        case elem(elem(@grid, y), x) do
+            0 -> find_bases(x + 1, y, [{x,y}|result])
+            _  -> find_bases(x + 1, y, result)
         end
     end
 end
 
-start  = Solution.find(?S, input_grid)
-ending = Solution.find(?E, input_grid)
+Solution.dijkstra([from]) |> length() |> IO.inspect(label: "Part1")
 
-IO.inspect(input_grid, label: "Grid")
-IO.inspect(dimensions, label: "Dimensions")
-IO.inspect(start, label: "Start")
-IO.inspect(ending, label: "End")
+true = :ets.delete(:visited)
 
-visited_nodes_table = :ets.new(:visited_nodes, [:set, :public, :named_table]) |> IO.inspect()
+:visited = :ets.new(:visited, [:set, :private, :named_table])
+
+bases = Solution.find_bases(0, 0, [])
+
+:ets.insert_new(:visited, Enum.map(bases, fn node -> {node, nil} end))
+
+Solution.dijkstra(bases) |> length() |> IO.inspect(label: "Part2")
