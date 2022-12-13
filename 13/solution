@@ -10,51 +10,57 @@ defmodule Solution do
         value
     end
 
-    def compare([], []) do
-        # reached end without find any out of order
-        :eq
+    # Compare left and right sides
+    # returns
+    #   :eq - left side equals to right side
+    #   :lt - left side lower than right side
+    #   :gt - left side greater than right side
+    def compare([], []), do: :eq
+    def compare([], rl) when is_list(rl), do: :lt
+    def compare(ll, []) when is_list(ll), do: :gt
+    def compare([l|ltail], right = [r|_]) when is_integer(l) and is_list(r) do
+        left = [[l]] ++ ltail
+        compare(left, right)
     end
-    def compare([], right) when is_list(right) do
-        # left side ran out
-        :lt
+    def compare(left = [l|_], [r|rtail]) when is_list(l) and is_integer(r) do
+        right = [[r]] ++ rtail
+        compare(left, right)
     end
-    def compare(left, []) when is_list(left) do
-        # right side ran out
-        :gt
+    def compare([l|ltail], [r|rtail]) when is_list(l) and is_list(r) do
+        case compare(l, r) do
+            :eq -> compare(ltail, rtail)
+            :lt -> :lt
+            :gt -> :gt
+        end
     end
-    def compare([left_head|left_tail], [right_head|right_tail]) when is_integer(left_head) and is_integer(right_head) do
+    def compare([l|ltail], [r|rtail]) when is_integer(l) and is_integer(r) do
         cond do
-            left_head == right_head -> compare(left_tail, right_tail)
-            left_head >  right_head -> :gt
-            left_head  < right_head -> :lt
+            l == r -> compare(ltail, rtail)
+            l > r -> :gt
+            l < r -> :lt
         end
-    end
-    def compare([left_head|left_tail], [right_head|right_tail]) when is_list(left_head) and is_list(right_head) do
-        case compare(left_head, right_head) do
-            :eq -> compare(left_tail, right_tail)
-            res -> res
-        end
-    end
-    def compare([left_head|left_tail], [right_head|right_tail]) when is_integer(left_head) and is_list(right_head) do
-        compare([[left_head]|left_tail], [right_head|right_tail])
-    end
-    def compare([left_head|left_tail], [right_head|right_tail]) when is_list(left_head) and is_integer(right_head) do
-        compare([left_head|left_tail],[[right_head]|right_tail])
     end
 end
 
 pairs  = String.split(input_content, "\n")
       |> Enum.reject(&(&1 == ""))
       |> Enum.map(&Solution.parse/1)
-      |> Enum.chunk_every(2)
-      # |> IO.inspect(charlists: :as_list, limit: :infinity)
 
-sorted_indexes = Enum.map(pairs, fn [l,r] -> Solution.compare(l,r) end)
+sorted_indexes = Enum.chunk_every(pairs, 2)
+               |> Enum.map(fn [l,r] -> Solution.compare(l,r) end)
                |> Enum.with_index(fn e,i -> {1+i,e} end)
-               # |> IO.inspect(charlists: :as_list, limit: :infinity)
-               |> Enum.filter(fn {index, comparison} -> comparison == :lt end)
+               |> Enum.filter(fn {_, cmp} -> cmp == :lt end)
                |> Enum.map(&(elem(&1, 0)))
-               # |> IO.inspect(charlists: :as_list, limit: :infinity)
 
-sorted_sum = Enum.sum(sorted_indexes) |> IO.inspect(label: "Part1", charlists: :as_list, limit: :infinity)
+IO.inspect(Enum.sum(sorted_indexes), label: "Part1", charlists: :as_list, limit: :infinity)
 
+separators = [[[2]], [[6]]]
+
+pairs = pairs ++ separators
+
+sorted_pairs = Enum.sort(pairs, &(Solution.compare(&1, &2) == :lt))
+
+separators_indexes = Enum.map(separators,
+    fn sep -> Enum.find_index(sorted_pairs, &(&1 == sep)) + 1 end)
+
+IO.inspect(Enum.product(separators_indexes), label: "Part2")
