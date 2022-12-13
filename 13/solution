@@ -12,32 +12,31 @@ defmodule Solution do
 
     def compare([], []) do
         # reached end without find any out of order
-        true
+        :eq
     end
-    def compare([], _) do
+    def compare([], right) when is_list(right) do
         # left side ran out
-        true
+        :lt
     end
-    def compare(_, []) do
+    def compare(left, []) when is_list(left) do
         # right side ran out
-        false
+        :gt
     end
     def compare([left_head|left_tail], [right_head|right_tail]) when is_integer(left_head) and is_integer(right_head) do
-        delta = left_head - right_head
         cond do
-            delta == 0 -> compare(left_tail, right_tail)
-            delta >  0 -> false
-            delta  < 0 -> true
+            left_head == right_head -> compare(left_tail, right_tail)
+            left_head >  right_head -> :gt
+            left_head  < right_head -> :lt
         end
     end
     def compare([left_head|left_tail], [right_head|right_tail]) when is_list(left_head) and is_list(right_head) do
         case compare(left_head, right_head) do
-            true  -> compare(left_tail, right_tail)
-            false -> false
+            :eq -> compare(left_tail, right_tail)
+            res -> res
         end
     end
     def compare([left_head|left_tail], [right_head|right_tail]) when is_integer(left_head) and is_list(right_head) do
-        compare([[left_head]|right_tail], [right_head|right_tail])
+        compare([[left_head]|left_tail], [right_head|right_tail])
     end
     def compare([left_head|left_tail], [right_head|right_tail]) when is_list(left_head) and is_integer(right_head) do
         compare([left_head|left_tail],[[right_head]|right_tail])
@@ -48,13 +47,14 @@ pairs  = String.split(input_content, "\n")
       |> Enum.reject(&(&1 == ""))
       |> Enum.map(&Solution.parse/1)
       |> Enum.chunk_every(2)
-      # |> IO.inspect(charlists: :as_list)
+      # |> IO.inspect(charlists: :as_list, limit: :infinity)
 
 sorted_indexes = Enum.map(pairs, fn [l,r] -> Solution.compare(l,r) end)
                |> Enum.with_index(fn e,i -> {1+i,e} end)
-               |> Enum.filter(fn {index, sorted} -> sorted end)
+               # |> IO.inspect(charlists: :as_list, limit: :infinity)
+               |> Enum.filter(fn {index, comparison} -> comparison == :lt end)
                |> Enum.map(&(elem(&1, 0)))
-               |> IO.inspect(charlists: :as_list)
+               # |> IO.inspect(charlists: :as_list, limit: :infinity)
 
-sorted_sum = Enum.sum(sorted_indexes)
-            |> IO.inspect(charlists: :as_list)
+sorted_sum = Enum.sum(sorted_indexes) |> IO.inspect(label: "Part1", charlists: :as_list, limit: :infinity)
+
