@@ -1,0 +1,60 @@
+#! /usr/bin/env elixir
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+defmodule Solution do
+    def parse(line) do
+        line = String.to_charlist(line) ++ '.'
+        {:ok, tokens, _}     = :erl_scan.string(line)
+        {:ok, abstract_form} = :erl_parse.parse_exprs(tokens)
+        {:value, value, _}   = :erl_eval.exprs(abstract_form, [])
+        value
+    end
+
+    def compare([], []) do
+        # reached end without find any out of order
+        true
+    end
+    def compare([], _) do
+        # left side ran out
+        true
+    end
+    def compare(_, []) do
+        # right side ran out
+        false
+    end
+    def compare([left_head|left_tail], [right_head|right_tail]) when is_integer(left_head) and is_integer(right_head) do
+        delta = left_head - right_head
+        cond do
+            delta == 0 -> compare(left_tail, right_tail)
+            delta >  0 -> false
+            delta  < 0 -> true
+        end
+    end
+    def compare([left_head|left_tail], [right_head|right_tail]) when is_list(left_head) and is_list(right_head) do
+        case compare(left_head, right_head) do
+            true  -> compare(left_tail, right_tail)
+            false -> false
+        end
+    end
+    def compare([left_head|left_tail], [right_head|right_tail]) when is_integer(left_head) and is_list(right_head) do
+        compare([[left_head]|right_tail], [right_head|right_tail])
+    end
+    def compare([left_head|left_tail], [right_head|right_tail]) when is_list(left_head) and is_integer(right_head) do
+        compare([left_head|left_tail],[[right_head]|right_tail])
+    end
+end
+
+pairs  = String.split(input_content, "\n")
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.map(&Solution.parse/1)
+      |> Enum.chunk_every(2)
+      # |> IO.inspect(charlists: :as_list)
+
+sorted_indexes = Enum.map(pairs, fn [l,r] -> Solution.compare(l,r) end)
+               |> Enum.with_index(fn e,i -> {1+i,e} end)
+               |> Enum.filter(fn {index, sorted} -> sorted end)
+               |> Enum.map(&(elem(&1, 0)))
+               |> IO.inspect(charlists: :as_list)
+
+sorted_sum = Enum.sum(sorted_indexes)
+            |> IO.inspect(charlists: :as_list)
