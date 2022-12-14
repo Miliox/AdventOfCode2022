@@ -33,7 +33,9 @@ defmodule Solution do
 
     def pour_sand(pos={x,y},y_max) do
         pos_candidates = [{x,y+1}, {x-1,y+1}, {x+1,y+1}]
-        pos_vacancies  = Enum.map(pos_candidates, fn pos -> !:ets.member(:cave, pos) end)
+        pos_vacancies  = Enum.map(pos_candidates,
+            fn pos = {_, pos_y} -> !:ets.member(:cave, pos)
+        end)
         result = case pos_vacancies do
             [true, _, _] -> {:move, Enum.fetch!(pos_candidates, 0)}
             [_, true, _] -> {:move, Enum.fetch!(pos_candidates, 1)}
@@ -42,18 +44,42 @@ defmodule Solution do
         end
         case result do
             :stuck -> pos
-            {:move, next_pos = {_, ny}} when ny <= y_max -> pour_sand(next_pos, y_max)
-            {:move, _} -> :sinked
+            {:move, next_pos = {_, ny}} when ny < y_max -> pour_sand(next_pos, y_max)
+            {:move, next_pos} -> next_pos
         end
     end
 
-    def fill_cave(sand_count, y_max) do
+    def fill_cave_part1(sand_count, y_max) do
         case pour_sand({500, 0}, y_max) do
-            :sinked  -> sand_count
+            rest_pos = {_,^y_max}  -> sand_count
+            rest_pos = {_,_}       ->
+                true = :ets.insert_new(:cave, {rest_pos, :sand})
+                fill_cave_part1(sand_count + 1, y_max)
+        end
+    end
+
+    def fill_cave_part2(sand_count, y_max) do
+        case pour_sand({500, 0}, y_max) do
+            rest_pos = {500, 0} ->
+                true = :ets.insert_new(:cave, {rest_pos, :sand})
+                sand_count + 1
             rest_pos = {_,_} ->
                 true = :ets.insert_new(:cave, {rest_pos, :sand})
-                fill_cave(sand_count + 1, y_max)
+                fill_cave_part2(sand_count + 1, y_max)
         end
+    end
+
+    def draw_cave(x_range, y_range) do
+        screen = Enum.map(y_range, fn y ->
+            Enum.map(x_range, fn x ->
+                case :ets.lookup(:cave, {x,y}) do
+                    [] -> ?.
+                    [{{^x,^y}, :rock}] -> ?#
+                    [{{^x,^y}, :sand}] -> ?o
+                end
+            end) ++ '\n'
+        end)
+        :io.format(screen)
     end
 end
 
@@ -77,6 +103,12 @@ y_max = Enum.fetch!(ys, -1)
 
 IO.inspect({{x_min, y_min},{x_max, y_max}})
 
-Solution.pour_sand({500,0}, y_max) |> IO.inspect()
+# Solution.pour_sand({500,0}, y_max) |> IO.inspect()
 
-Solution.fill_cave(0, y_max) |> IO.inspect()
+# Solution.fill_cave_part1(0, y_max) |> IO.inspect(label: "Part1")
+
+# 
+
+Solution.fill_cave_part2(0, y_max + 1) |> IO.inspect(label: "Part2")
+
+Solution.draw_cave(x_min-10..x_max+10,0..y_max+1)
