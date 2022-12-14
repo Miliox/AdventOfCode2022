@@ -1,0 +1,82 @@
+#! /usr/bin/env elixir
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+defmodule Solution do
+    def parse_input(input), do: Enum.map(String.split(input, "\n"), &Solution.parse_line/1)
+    def parse_line(line),   do: Enum.map(String.split(line, " -> "), &Solution.parse_xy/1)
+    def parse_xy(xy),       do: String.split(xy, ",") |> Enum.map(&String.to_integer/1) |> List.to_tuple()
+
+    def list_edges(points), do: list_edges(points, [])
+
+    def list_edges([a|[b|[]]], result), do: Enum.reverse([{a,b}|result])
+    def list_edges([a|[b|c]],  result), do: list_edges([b|c], [{a,b}|result])
+
+    def raster_cave({{x,y}, {x,y}}) do
+        :ets.insert_new(:cave, {{x,y}, :rock})
+    end
+    def raster_cave({{x,y0}, {x,y1}}) do
+        :ets.insert_new(:cave, {{x,y0}, :rock})
+        d = case y0 < y1 do
+            true  -> +1
+            false -> -1
+        end
+        raster_cave({{x,y0+d}, {x,y1}})
+    end
+    def raster_cave({{x0,y}, {x1,y}}) do
+        :ets.insert_new(:cave, {{x0,y}, :rock})
+        d = case x0 < x1 do
+            true  -> +1
+            false -> -1
+        end
+        raster_cave({{x0+d,y}, {x1,y}})
+    end
+
+    def pour_sand(pos={x,y},y_max) do
+        pos_candidates = [{x,y+1}, {x-1,y+1}, {x+1,y+1}]
+        pos_vacancies  = Enum.map(pos_candidates, fn pos -> !:ets.member(:cave, pos) end)
+        result = case pos_vacancies do
+            [true, _, _] -> {:move, Enum.fetch!(pos_candidates, 0)}
+            [_, true, _] -> {:move, Enum.fetch!(pos_candidates, 1)}
+            [_, _, true] -> {:move, Enum.fetch!(pos_candidates, 2)}
+            [_, _, _] -> :stuck
+        end
+        case result do
+            :stuck -> pos
+            {:move, next_pos = {_, ny}} when ny <= y_max -> pour_sand(next_pos, y_max)
+            {:move, _} -> :sinked
+        end
+    end
+
+    def fill_cave(sand_count, y_max) do
+        case pour_sand({500, 0}, y_max) do
+            :sinked  -> sand_count
+            rest_pos = {_,_} ->
+                true = :ets.insert_new(:cave, {rest_pos, :sand})
+                fill_cave(sand_count + 1, y_max)
+        end
+    end
+end
+
+edges = Solution.parse_input(input_content)
+        |> Enum.map(&Solution.list_edges/1)
+        |> Enum.concat()
+
+:cave = :ets.new(:cave, [:set, :private, :named_table])
+
+# rasterize edges into the cave
+Enum.map(edges, &Solution.raster_cave/1)
+
+xs = Enum.map(edges, fn {{ax,_},{bx,_}} -> [ax, bx] end) |> Enum.concat() |> Enum.sort()
+ys = Enum.map(edges, fn {{_,ay},{_,by}} -> [ay, by] end) |> Enum.concat() |> Enum.sort()
+
+# bound box
+x_min = Enum.fetch!(xs, +0)
+x_max = Enum.fetch!(xs, -1)
+y_min = Enum.fetch!(ys, +0)
+y_max = Enum.fetch!(ys, -1)
+
+IO.inspect({{x_min, y_min},{x_max, y_max}})
+
+Solution.pour_sand({500,0}, y_max) |> IO.inspect()
+
+Solution.fill_cave(0, y_max) |> IO.inspect()
