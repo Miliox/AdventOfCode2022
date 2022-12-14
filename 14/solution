@@ -103,12 +103,11 @@ y_max = Enum.fetch!(ys, -1)
 
 IO.inspect({{x_min, y_min},{x_max, y_max}})
 
-# Solution.pour_sand({500,0}, y_max) |> IO.inspect()
+Solution.fill_cave_part1(0, y_max) |> IO.inspect(label: "Part1")
 
-# Solution.fill_cave_part1(0, y_max) |> IO.inspect(label: "Part1")
-
-# 
+:ets.delete_all_objects(:cave)
+Enum.map(edges, &Solution.raster_cave/1)
 
 Solution.fill_cave_part2(0, y_max + 1) |> IO.inspect(label: "Part2")
 
-Solution.draw_cave(x_min-10..x_max+10,0..y_max+1)
+# Solution.draw_cave(x_min-10..x_max+10,0..y_max+1)
