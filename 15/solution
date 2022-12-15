@@ -1,0 +1,93 @@
+#! /usr/bin/env elixir
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+{:ok, regex} = Regex.compile("Sensor at x=(-?\\d+), y=(-?\\d+): closest beacon is at x=(-?\\d+), y=(-?\\d+)")
+
+sensors = Regex.scan(regex, input_content) |> Enum.map(fn [_, sx, sy, bx, by] ->
+    [sx, sy, bx, by] = Enum.map([sx, sy, bx, by], &String.to_integer/1)
+
+    [{sx, sy}, abs(sx - bx) + abs(sy - by), {bx, by}]
+end)
+
+defmodule Solution do
+    def bounds([[{sx,sy}, r, _]|sensors]) do
+        bounds(sensors, sx-r, sx+r, sy-r, sy+r)
+    end
+
+    defp bounds([], x0, xN, y0, yN), do: {x0, xN, y0, yN}
+    defp bounds([[{sx, sy}, r, _]|sensors], x0, xN, y0, yN) do
+        sx0 = sx - r
+        sxN = sx + r
+        sy0 = sy - r
+        syN = sy + r
+
+        bounds(
+            sensors,
+            Enum.min([x0, sx0]),
+            Enum.max([xN, sxN]),
+            Enum.min([y0, sy0]),
+            Enum.max([yN, syN]))
+    end
+
+    defp beacon_at?(_pos, []), do: false
+    defp beacon_at?(pos, [[_, _, pos]|_sensors]), do: true
+    defp beacon_at?(pos, [_|sensors]), do: beacon_at?(pos, sensors)
+
+    defp sensors_at?(_pos, []), do: false
+    defp sensors_at?(pos, [[pos, _, _]|_sensors]), do: true
+    defp sensors_at?(pos, [_|sensors]), do: beacon_at?(pos, sensors)
+
+    defp coverage?(_pos, []), do: false
+    defp coverage?(pos = {x,y}, [[{sx,sy}, reach, _]|sensors]) do
+        delta = abs(sx - x) + abs(sy - y)
+        case delta <= reach do
+            true  -> true
+            false -> coverage?(pos, sensors)
+        end
+    end
+
+    #@y 10
+    @y 2000000
+    def no_beacon_line_scan(x, xN, count, _) when x > xN do
+        count
+    end
+    def no_beacon_line_scan(x, xN, count, sensors) do
+        pos = {x, @y}
+        cond do
+            beacon_at?( pos, sensors) -> no_beacon_line_scan(x+1, xN, count, sensors)
+            sensors_at?(pos, sensors) -> no_beacon_line_scan(x+1, xN, count+1, sensors)
+            coverage?(  pos, sensors) -> no_beacon_line_scan(x+1, xN, count+1, sensors)
+            true -> no_beacon_line_scan(x+1, xN, count, sensors)
+        end
+    end
+
+    #@limit 20
+    @limit 4000000
+    def distress_source(_x,y,_sensors) when y > @limit do
+        nil
+    end
+    def distress_source(x,y,sensors) when x > @limit do
+        distress_source(0,y+1,sensors)
+    end
+    def distress_source(x,y,sensors) do
+        skip = Enum.find_value(sensors,
+            fn [{sx, sy}, reach, _] ->
+                delta = abs(sx - x) + abs(sy - y)
+                if delta <= reach, do: reach - delta + 1
+            end)
+        case skip do
+            nil -> {x,y}
+            _   -> distress_source(x+skip, y, sensors)
+        end
+    end
+end
+
+{x0, xN, _y0, _yN} = Solution.bounds(sensors)
+
+IO.inspect(Solution.no_beacon_line_scan(x0, xN, 0, sensors), label: "Part1")
+
+{distress_x, distress_y} = Solution.distress_source(0, 0, sensors)
+
+tuning_frequency = distress_x * 4000000 + distress_y
+
+IO.inspect(tuning_frequency, label: "Part2")
