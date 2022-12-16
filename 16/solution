@@ -1,104 +1,64 @@
 #! /usr/bin/env elixir
 {:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
-{:ok, regex} = Regex.compile("Valve (\\w+) has flow rate=(\\d+); tunnels? leads? to valves? (\\w+[, \\w+]*)")
 
-:valves = :ets.new(:valves, [:set, :private, :named_table])
-
-valves = Regex.scan(regex, input_content) |> Enum.map(fn [_, src_valve, flow_rate, dst_valves] ->
-    true = :ets.insert_new(:valves, {src_valve, String.to_integer(flow_rate), String.split(dst_valves, ", ")})
-    src_valve
-end) |> IO.inspect()
-
-defmodule PathFinder do
-    def path_between(src, dst) do
-        bfs([[src]], dst, [])
+defmodule Utils do
+    def parse(input) do
+        {:ok, regex} = Regex.compile("Valve (\\w+) has flow rate=(\\d+); tunnels? leads? to valves? (\\w+[, \\w+]*)")
+        matches = Regex.scan(regex, input)
+        Enum.map(matches, fn [_, valve, rate, adjs] ->
+            adjs = String.split(adjs, ", ")
+            rate = String.to_integer(rate)
+            {valve, rate, adjs}
+        end)
     end
 
-    defp bfs([], _, _), do: :error
-    defp bfs([path = [dst|_]|_], dst, _), do: {:ok, path}
-    defp bfs([path = [node|_]|paths], dst, visited) do
+    def gen_routes(valves) do
+        Enum.reduce(valves, %{}, fn {v0,_,_}, map1 ->
+            Enum.reduce(valves, map1, fn {v1,_,_}, map2 ->
+                {:ok, path} = Utils.find_path(v0, v1, valves)
+                Map.put(map2, v0 <> v1, path)
+            end)
+        end)
+    end
+
+    def find_path(src, dst, valves) do
+        bfs([[src]], dst, valves, [])
+    end
+    defp bfs([], _, _, _), do: :error
+    defp bfs([path = [dst |_]|    _], dst, _, _), do: {:ok, path}
+    defp bfs([path = [node|_]|paths], dst, valves, visited) do
         visited = [node|visited]
 
-        [{^node, _, adjs}] = :ets.lookup(:valves, node)
+        {^node, _, adjs} = Enum.find(valves, fn {v, _, _} ->  v == node end)
 
         adjs = Enum.reject(adjs, fn a -> Enum.member?(visited, a) end)
 
-        bfs(paths ++ Enum.map(adjs, fn a -> [a|path] end), dst, visited)
+        bfs(paths ++ Enum.map(adjs, fn a -> [a|path] end), dst, valves, visited)
+    end
+
+    def close_valves(0, _, _, _, rate, total) do
+        {rate, total}
+    end
+    def close_valves(timeout, vcurr, [], routes, rate, total) do
+        timeout = timeout - 1
+        total = total + rate
+        close_valves(timeout, vcurr, [], routes, rate, total)
+    end
+    def close_valves(timeout, vcurr, [{vnext, vrate, _}|path], routes, rate, total) do
+        distance = length(Map.fetch!(routes, vcurr <> vnext) |> IO.inspect()) - 1
+        timeout = timeout - distance
+        total = total + (rate * distance) + vrate
+        rate = rate + vrate
+        close_valves(timeout, vnext, path, routes, rate, total)
     end
 end
 
-defmodule Solution do
-    def solve(routes, timeout, at_valve, valves_to_turn) do
-        loop(routes, [{timeout, at_valve, valves_to_turn, 0, 0}], [])
-    end
+valves = Utils.parse(input_content) |> IO.inspect(label: "Valves")
+routes = Utils.gen_routes(valves) |> IO.inspect(label: "Routes")
 
-    defp loop(_, [], result), do: result
-    defp loop(routes, [task|tasks], result) do
-        case task do
-            {0, _,  _,  _,  _} -> loop(routes, tasks, [task|result])
-            {t, v, [], rr, rt} -> loop(routes, [{t-1,v,[],rr,rt+rr}|tasks], result)
-            {t, v, vs, rr, rt} -> loop(routes,
-                Enum.map(vs, fn w = {wv, wfr} ->
-                    p = Map.fetch!(routes, v <> wv)
-                    d = length(p)
-                    {t-d, wv, vs -- [w], rr + wfr, rt + rr * (d - 1) + wfr}
-                end) ++ tasks, result) |> IO.inspect()
-        end
-    end
-end
+work_valves = Enum.filter(valves, fn
+    {_,0,_} -> false
+    {_,_,_} -> true
+end) |> Enum.sort(fn {_,r1,_},{_,r2,_} -> r1 > r2 end) |> IO.inspect(label: "Work Valves")
 
-# defmodule Solution do
-#     def loop([], finished_paths) do
-#         finished_paths
-#     end
-#     def loop([path = {0, _, _, _, _}|in_progress_paths], finished_paths) do
-#         IO.inspect(path)
-#         loop(in_progress_paths, [path|finished_paths])
-#     end
-#     def loop([path = {1, next_valve, opened_valves, release_rate, release_total}|in_progress_paths], finished_paths) do
-#         IO.inspect(path)
-#         [{^next_valve, flow_rate, _}] = :ets.lookup(:valves, next_valve)
-#         case open_valve?(next_valve, flow_rate, opened_valves) do
-#             true ->
-#                 opened_valves = [next_valve|opened_valves]
-#                 release_rate  = release_rate + flow_rate
-#                 release_total = release_total + release_rate
-#                 loop(in_progress_paths, [{0, next_valve, opened_valves, release_rate, release_total}|finished_paths])
-#             false ->
-#                 release_total = release_total + release_rate
-#                 loop(in_progress_paths, [{0, next_valve, opened_valves, release_rate, release_total}|finished_paths])
-#         end
-#     end
-#     def loop([path = {timeout, next_valve, opened_valves, release_rate, release_total}|in_progress_paths], finished_paths) when timeout > 1 do
-#         [{^next_valve, flow_rate, adj_valves}] = :ets.lookup(:valves, next_valve)
-#         case open_valve?(next_valve, flow_rate, opened_valves) do
-#             true ->
-#                 opened_valves = [next_valve|opened_valves]
-#                 release_rate  = release_rate + flow_rate
-#                 release_total = release_total + 2 * release_rate
-#                 loop(Enum.map(adj_valves, fn v -> {timeout - 2, v, opened_valves, release_rate, release_total} end) ++ in_progress_paths, finished_paths)
-#             false ->
-#                 release_total = release_total + release_rate
-#                 loop(Enum.map(adj_valves, fn v -> {timeout - 1, v, opened_valves, release_rate, release_total} end) ++ in_progress_paths, finished_paths)
-#         end
-#     end
-# 
-#     def open_valve?(valve, flow_rate, opened_valves) do
-#         flow_rate > 0 and !Enum.member?(opened_valves, valve) 
-#     end
-# end
-
-# Solution.loop([{10, "AA", [], 0, 0}], []) |> IO.inspect(label: "Paths")
-route_table = Enum.reduce(valves, %{}, fn v0, map1 -> 
-    Enum.reduce(valves, map1, fn v1, map2 ->
-        {:ok, path} = PathFinder.path_between(v0, v1)
-        Map.put(map2, v0 <> v1, path)
-    end)
-end) |> IO.inspect()
-
-working_valves = Enum.map(valves, fn v ->
-    [{^v, fr, _}] = :ets.lookup(:valves, v)
-    {v, fr}
-end) |> Enum.reject(fn {_, fr} -> fr == 0 end) |> IO.inspect()
-
-Solution.solve(route_table, 30, "AA", working_valves) |> Enum.sort(fn {_, _, _, _, n},{_, _, _, _, m} -> n <= m end) |> Enum.at(-1) |> IO.inspect()
+Utils.close_valves(30, "AA", work_valves, routes, 0, 0) |> IO.inspect()
