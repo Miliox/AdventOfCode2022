@@ -1,0 +1,9 @@
+#! /usr/bin/env elixir
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+{:ok, regex} = Regex.compile("Valve (\\w+) has flow rate=(\\d+); tunnels? leads? to valves? (\\w+[, \\w+]*)")
+
+Regex.scan(regex, input_content) |> Enum.map(fn [_, src_valve, flow_rate, dst_valves] ->
+    flow_rate = String.to_integer(flow_rate)
+    dst_valves = String.split(dst_valves, ", ")
+    {src_valve, dst_valves, flow_rate}
+end) |> IO.inspect()
