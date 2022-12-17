@@ -2,19 +2,21 @@
 {:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
 
 defmodule Tetris do
-    def fill_floor(xrange),         do: for x     <- xrange, do: :ets.insert_new(:chamber, {{x,0}, :floor})
-    def fill_wall(x, yrange),       do: for y     <- yrange, do: :ets.insert_new(:chamber, {{x,y}, :wall})
-    def land_rocks(rocks),          do: for {x,y} <- rocks,  do: true = :ets.insert_new(:chamber, {{x,y}, :rock})
-    def move_rocks(rocks, {dx,dy}), do: for {x,y} <- rocks,  do: {x+dx,y+dy}
-
-    def fill_walls(xrange, yrange) do
-        for y <- yrange, do: :ets.insert(:chamber, {{xrange.first, y}, :wall})
-        for y <- yrange, do: :ets.insert(:chamber, {{xrange.last,  y}, :wall})
+    def land_rocks(rocks), do: for {x,y} <- rocks, do: :ets.insert(:chamber, {y, x, :rock})
+    def move_rocks(rocks, {dx,dy}, xrange, yrange) do
+        rocks = for {x,y} <- rocks, do: {x+dx,y+dy}
+        case vacant?(rocks, xrange, yrange) do
+            true -> {:ok, rocks}
+            false -> :error
+        end
     end
 
-    def can_move?(rocks, {dx,dy}) do
-        Enum.all?(rocks, fn {x,y} ->
-            not :ets.member(:chamber, {x+dx,y+dy})
+    def vacant?(slots, xrange, yrange) do
+        Enum.all?(slots, fn {x,y} ->
+            x > xrange.first and
+            x < xrange.last and
+            y < yrange.last and
+            not Enum.member?(:ets.lookup(:chamber, y) |> Enum.map(&(elem(&1, 1))), x)
         end)
     end
 
@@ -28,50 +30,53 @@ defmodule Tetris do
         xstart = xstart + xrange.first + 1
         ystart = ystart + yrange.first
 
-        # IO.inspect({xstart,ystart}, label: "Start Pos")
+        {:ok, rocks} = move_rocks(elem(shape, 2), {xstart,ystart}, xrange, yrange)
 
-        rocks = move_rocks(elem(shape, 2), {xstart,ystart})
-
-        wall_yrange = top(rocks)..(yrange.first-1)
-        fill_wall(xrange.first, wall_yrange)
-        fill_wall(xrange.last,  wall_yrange)
-
-        drop_rock_loop(rocks, stream, [])
+        drop_rock_loop(rocks, stream, [], xrange, yrange)
     end
 
-    defp decode_dir(?<), do: {-1,0}
-    defp decode_dir(?>), do: {+1,0}
+    defp decode_delta(?<), do: {-1,0}
+    defp decode_delta(?>), do: {+1,0}
 
-    defp drop_rock_loop(rocks, [], revstream) when length(revstream) > 0 do
+    defp drop_rock_loop(rocks, [], revstream, xrange, yrange) do
         # repeate stream
-        drop_rock_loop(rocks, Enum.reverse(revstream), [])
+        drop_rock_loop(rocks, Enum.reverse(revstream), [], xrange, yrange)
     end
-    defp drop_rock_loop(rocks, [char|stream], revstream) do
-        dir = decode_dir(char)
-        rocks = case can_move?(rocks, dir) do
-            true  -> move_rocks(rocks, dir)
-            false -> rocks
+    defp drop_rock_loop(rocks, [symbol|stream], revstream, xrange, yrange) do
+        delta     = decode_delta(symbol)
+        revstream = [symbol|revstream]
+
+        rocks = case move_rocks(rocks, delta, xrange, yrange) do
+            {:ok, next} -> next
+            :error      -> rocks
         end
 
         down = {0, +1}
-        case can_move?(rocks, down) do
-            true ->
-                rocks = move_rocks(rocks, down)
-                drop_rock_loop(rocks, stream, [char|revstream])
-            false ->
+        case move_rocks(rocks, down, xrange, yrange) do
+            {:ok, next} ->
+                drop_rock_loop(next, stream, revstream, xrange, yrange)
+            :error ->
                 land_rocks(rocks)
-                {rocks, stream ++ Enum.reverse([char|revstream])}
+                {rocks, stream ++ Enum.reverse(revstream)}
         end
     end
 
     def draw_chamber(xrange, yrange) do
         screen = Enum.map(yrange, fn y ->
+            row = :ets.lookup(:chamber, y)
             Enum.map(xrange, fn x ->
-                case :ets.lookup(:chamber, {x,y}) do
-                    [] -> ?.
-                    [{{^x,^y}, :floor}] -> ?-
-                    [{{^x,^y}, :rock}]  -> ?#
-                    [{{^x,^y}, :wall}]  -> ?|
+                case Enum.find(row, fn {^y, ^x, _} -> true
+                                       { _,  _, _} -> false end) do
+                    nil ->
+                        cond do
+                            y == yrange.last and x == xrange.first -> ?+
+                            y == yrange.last and x == xrange.last  -> ?+
+                            y == yrange.last  -> ?-
+                            x == xrange.first -> ?|
+                            x == xrange.last  -> ?|
+                            true -> ?.
+                        end
+                    {^y, ^x, :rock} -> ?#
                 end
             end) ++ '\n'
         end)
@@ -90,6 +95,8 @@ defmodule Tetris do
             false -> yrange
         end
 
+        # draw_chamber(xrange, yrange)
+
         drop_n_rocks(n+1, nmax, xrange, yrange, shapes, stream)
     end
 end
@@ -106,9 +113,9 @@ stream = String.to_charlist(input_content)
 xrange = 0..8
 yrange = -0..+0
 
-:chamber = :ets.new(:chamber, [:set, :private, :named_table])
-Tetris.fill_floor(xrange)
+:chamber = :ets.new(:chamber, [:bag, :private, :named_table])
 
+# result = Tetris.drop_n_rocks(0, 2, xrange, yrange, shapes, stream)
 result = Tetris.drop_n_rocks(0, 2022, xrange, yrange, shapes, stream)
 # result = Tetris.drop_n_rocks(0, 1000000000000, xrange, yrange, shapes, stream)
 
