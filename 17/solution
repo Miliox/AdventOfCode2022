@@ -49,12 +49,8 @@ defmodule Tetris do
     defp drop_rock_loop(rocks, [char|stream], revstream) do
         dir = decode_dir(char)
         rocks = case can_move?(rocks, dir) do
-            true  ->
-                # IO.inspect(dir, label: "Moved")
-                move_rocks(rocks, dir)
-            false ->
-                # IO.inspect(dir, label: "Nothing")
-                rocks
+            true  -> move_rocks(rocks, dir)
+            false -> rocks
         end
 
         down = {0, +1}
@@ -81,6 +77,21 @@ defmodule Tetris do
         end)
         :io.format(screen)
     end
+
+    def drop_n_rocks(n, n, xrange, yrange, shapes, stream) do
+        {xrange, yrange, shapes, stream}
+    end
+    def drop_n_rocks(n, nmax, xrange, yrange, shapes, stream) do
+        {rocks, stream} = Tetris.drop_rock(xrange, yrange, Enum.at(shapes, rem(n, length(shapes))), stream)
+        rocks_top      = Tetris.top(rocks)
+
+        yrange = case rocks_top < yrange.first do
+            true  -> rocks_top..yrange.last
+            false -> yrange
+        end
+
+        drop_n_rocks(n+1, nmax, xrange, yrange, shapes, stream)
+    end
 end
 
 shapes = [
@@ -98,48 +109,7 @@ yrange = -0..+0
 :chamber = :ets.new(:chamber, [:set, :private, :named_table])
 Tetris.fill_floor(xrange)
 
-result = Enum.reduce(0..2021, {xrange, yrange, shapes, stream}, fn n, {xrange, yrange, shapes, stream} ->
-    {rocks, stream} = Tetris.drop_rock(xrange, yrange, Enum.at(shapes, rem(n, length(shapes))), stream)
-    rocks_top      = Tetris.top(rocks)
-
-    yrange = case rocks_top < yrange.first do
-        true  -> rocks_top..yrange.last
-        false -> yrange
-    end
-
-    # Tetris.draw_chamber(xrange,yrange)
-
-    {xrange, yrange, shapes, stream}
-end)
+result = Tetris.drop_n_rocks(0, 2022, xrange, yrange, shapes, stream)
+# result = Tetris.drop_n_rocks(0, 1000000000000, xrange, yrange, shapes, stream)
 
 IO.inspect(abs(elem(result, 1).first), label: "Result")
-
-# {landed_rocks, stream} = Tetris.drop_rock(xrange, yrange, Enum.at(shapes, 0), stream)
-# landed_rocks_ymin      = Tetris.top(landed_rocks)
-# 
-# yrange = case landed_rocks_ymin < yrange.first do
-#     true  -> landed_rocks_ymin..yrange.last
-#     false -> yrange
-# end
-# 
-# Tetris.draw_chamber(xrange,yrange)
-# 
-# {landed_rocks, stream} = Tetris.drop_rock(xrange, yrange, Enum.at(shapes, 1), stream)
-# landed_rocks_ymin      = Tetris.top(landed_rocks)
-# 
-# yrange = case landed_rocks_ymin < yrange.first do
-#     true  -> landed_rocks_ymin..yrange.last
-#     false -> yrange
-# end
-# 
-# Tetris.draw_chamber(xrange,yrange)
-# 
-# {landed_rocks, stream} = Tetris.drop_rock(xrange, yrange, Enum.at(shapes, 2), stream)
-# landed_rocks_ymin      = Tetris.top(landed_rocks)
-# 
-# yrange = case landed_rocks_ymin < yrange.first do
-#     true  -> landed_rocks_ymin..yrange.last
-#     false -> yrange
-# end
-
-# Tetris.draw_chamber(xrange,yrange)
