@@ -24,7 +24,7 @@ defmodule Tetris do
         rocks |> Enum.map(&(elem(&1, 1))) |> Enum.min()
     end
 
-    def drop_rock(xrange, yrange, shape, stream) do
+    def drop_rock(xrange, yrange, shape, stream, revstream) do
         {xstart, ystart} = elem(shape, 1)
 
         xstart = xstart + xrange.first + 1
@@ -32,7 +32,7 @@ defmodule Tetris do
 
         {:ok, rocks} = move_rocks(elem(shape, 2), {xstart,ystart}, xrange, yrange)
 
-        drop_rock_loop(rocks, stream, [], xrange, yrange)
+        drop_rock_loop(rocks, stream, revstream, xrange, yrange)
     end
 
     defp decode_delta(?<), do: {-1,0}
@@ -57,7 +57,7 @@ defmodule Tetris do
                 drop_rock_loop(next, stream, revstream, xrange, yrange)
             :error ->
                 land_rocks(rocks)
-                {rocks, stream ++ Enum.reverse(revstream)}
+                {rocks, stream, revstream}
         end
     end
 
@@ -83,11 +83,19 @@ defmodule Tetris do
         :io.format(screen)
     end
 
-    def drop_n_rocks(n, n, xrange, yrange, shapes, stream) do
-        {xrange, yrange, shapes, stream}
+    def drop_n_rocks(n, n, xrange, yrange, shapes, revshapes, stream, revstream) do
+        {xrange, yrange, shapes ++ Enum.reverse(revshapes), stream ++ Enum.reverse(revstream)}
     end
-    def drop_n_rocks(n, nmax, xrange, yrange, shapes, stream) do
-        {rocks, stream} = Tetris.drop_rock(xrange, yrange, Enum.at(shapes, rem(n, length(shapes))), stream)
+    def drop_n_rocks(n, nmax, xrange, yrange, [], revshapes, stream, revstream) do
+        drop_n_rocks(n, nmax, xrange, yrange, Enum.reverse(revshapes), [], stream, revstream)
+    end
+    def drop_n_rocks(n, nmax, xrange, yrange, shapes, revshapes, [], revstream) do
+        drop_n_rocks(n, nmax, xrange, yrange, shapes, revshapes, Enum.reverse(revstream), [])
+    end
+    def drop_n_rocks(n, nmax, xrange, yrange, [s|shapes], revshapes, stream, revstream) do
+        revshapes = [s|revshapes]
+
+        {rocks, stream, revstream} = Tetris.drop_rock(xrange, yrange, s, stream, revstream)
         rocks_top      = Tetris.top(rocks)
 
         yrange = case rocks_top < yrange.first do
@@ -97,7 +105,16 @@ defmodule Tetris do
 
         # draw_chamber(xrange, yrange)
 
-        drop_n_rocks(n+1, nmax, xrange, yrange, shapes, stream)
+        yrange = case Range.size(yrange) > 1000000 do
+            true ->
+                IO.inspect({n, :os.timestamp()}, label: "N")
+                Enum.each((yrange.first+100)..yrange.last, fn y -> :ets.delete(:chamber, y) end)
+                yrange.first..(yrange.first+100)
+            false ->
+                yrange
+        end
+
+        drop_n_rocks(n+1, nmax, xrange, yrange, shapes, revshapes, stream, revstream)
     end
 end
 
@@ -115,8 +132,8 @@ yrange = -0..+0
 
 :chamber = :ets.new(:chamber, [:bag, :private, :named_table])
 
-# result = Tetris.drop_n_rocks(0, 2, xrange, yrange, shapes, stream)
-result = Tetris.drop_n_rocks(0, 2022, xrange, yrange, shapes, stream)
-# result = Tetris.drop_n_rocks(0, 1000000000000, xrange, yrange, shapes, stream)
+# result = Tetris.drop_n_rocks(0, 2, xrange, yrange, shapes, [], stream, [])
+# result = Tetris.drop_n_rocks(0, 2022, xrange, yrange, shapes, [], stream, [])
+result = Tetris.drop_n_rocks(0, 1000000000000, xrange, yrange, shapes, [], stream, [])
 
 IO.inspect(abs(elem(result, 1).first), label: "Result")
