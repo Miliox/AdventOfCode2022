@@ -1,22 +1,37 @@
 #! /usr/bin/env elixir
 {:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
 
+import Bitwise
+
 defmodule Tetris do
-    def land_rocks(rocks), do: for {x,y} <- rocks, do: :ets.insert(:chamber, {y, x, :rock})
-    def move_rocks(rocks, {dx,dy}, xrange, yrange) do
+    def land_rocks(rocks, circular_buffer) do
+        Enum.reduce(rocks, circular_buffer, fn {x, y}, cb ->
+            y = rem(abs(y), tuple_size(cb))
+            x = 1 <<< x
+
+            row = elem(cb, y)
+            row = row ||| x
+
+            put_elem(cb, y, row)
+        end)
+    end
+    def move_rocks(rocks, {dx,dy}, xrange, yrange, circular_buffer) do
         rocks = for {x,y} <- rocks, do: {x+dx,y+dy}
-        case vacant?(rocks, xrange, yrange) do
+        case vacant?(rocks, xrange, yrange, circular_buffer) do
             true -> {:ok, rocks}
             false -> :error
         end
     end
 
-    def vacant?(slots, xrange, yrange) do
+    def vacant?(slots, xrange, yrange, circular_buffer) do
         Enum.all?(slots, fn {x,y} ->
-            x > xrange.first and
-            x < xrange.last and
-            y < yrange.last and
-            not Enum.member?(:ets.lookup(:chamber, y) |> Enum.map(&(elem(&1, 1))), x)
+            case  x > xrange.first and x < xrange.last and y < yrange.last do
+                false -> false
+                true ->
+                    y = rem(abs(y), tuple_size(circular_buffer))
+                    x = 1 <<< x
+                    (elem(circular_buffer, y) &&& x) == 0
+            end
         end)
     end
 
@@ -24,40 +39,40 @@ defmodule Tetris do
         rocks |> Enum.map(&(elem(&1, 1))) |> Enum.min()
     end
 
-    def drop_rock(xrange, yrange, shape, stream, revstream) do
+    def drop_rock(xrange, yrange, shape, stream, revstream, circular_buffer) do
         {xstart, ystart} = elem(shape, 1)
 
         xstart = xstart + xrange.first + 1
         ystart = ystart + yrange.first
 
-        {:ok, rocks} = move_rocks(elem(shape, 2), {xstart,ystart}, xrange, yrange)
+        {:ok, rocks} = move_rocks(elem(shape, 2), {xstart,ystart}, xrange, yrange, circular_buffer)
 
-        drop_rock_loop(rocks, stream, revstream, xrange, yrange)
+        drop_rock_loop(rocks, stream, revstream, xrange, yrange, circular_buffer)
     end
 
     defp decode_delta(?<), do: {-1,0}
     defp decode_delta(?>), do: {+1,0}
 
-    defp drop_rock_loop(rocks, [], revstream, xrange, yrange) do
+    defp drop_rock_loop(rocks, [], revstream, xrange, yrange, circular_buffer) do
         # repeate stream
-        drop_rock_loop(rocks, Enum.reverse(revstream), [], xrange, yrange)
+        drop_rock_loop(rocks, Enum.reverse(revstream), [], xrange, yrange, circular_buffer)
     end
-    defp drop_rock_loop(rocks, [symbol|stream], revstream, xrange, yrange) do
+    defp drop_rock_loop(rocks, [symbol|stream], revstream, xrange, yrange, circular_buffer) do
         delta     = decode_delta(symbol)
         revstream = [symbol|revstream]
 
-        rocks = case move_rocks(rocks, delta, xrange, yrange) do
+        rocks = case move_rocks(rocks, delta, xrange, yrange, circular_buffer) do
             {:ok, next} -> next
             :error      -> rocks
         end
 
         down = {0, +1}
-        case move_rocks(rocks, down, xrange, yrange) do
+        case move_rocks(rocks, down, xrange, yrange, circular_buffer) do
             {:ok, next} ->
-                drop_rock_loop(next, stream, revstream, xrange, yrange)
+                drop_rock_loop(next, stream, revstream, xrange, yrange, circular_buffer)
             :error ->
-                land_rocks(rocks)
-                {rocks, stream, revstream}
+                circular_buffer = land_rocks(rocks, circular_buffer)
+                {rocks, stream, revstream, circular_buffer}
         end
     end
 
@@ -83,19 +98,19 @@ defmodule Tetris do
         :io.format(screen)
     end
 
-    def drop_n_rocks(n, n, xrange, yrange, shapes, revshapes, stream, revstream) do
-        {xrange, yrange, shapes ++ Enum.reverse(revshapes), stream ++ Enum.reverse(revstream)}
+    def drop_n_rocks(n, n, xrange, yrange, shapes, revshapes, stream, revstream, circular_buffer) do
+        {xrange, yrange, shapes ++ Enum.reverse(revshapes), stream ++ Enum.reverse(revstream), circular_buffer}
     end
-    def drop_n_rocks(n, nmax, xrange, yrange, [], revshapes, stream, revstream) do
-        drop_n_rocks(n, nmax, xrange, yrange, Enum.reverse(revshapes), [], stream, revstream)
+    def drop_n_rocks(n, nmax, xrange, yrange, [], revshapes, stream, revstream, circular_buffer) do
+        drop_n_rocks(n, nmax, xrange, yrange, Enum.reverse(revshapes), [], stream, revstream, circular_buffer)
     end
-    def drop_n_rocks(n, nmax, xrange, yrange, shapes, revshapes, [], revstream) do
-        drop_n_rocks(n, nmax, xrange, yrange, shapes, revshapes, Enum.reverse(revstream), [])
+    def drop_n_rocks(n, nmax, xrange, yrange, shapes, revshapes, [], revstream, circular_buffer) do
+        drop_n_rocks(n, nmax, xrange, yrange, shapes, revshapes, Enum.reverse(revstream), [], circular_buffer)
     end
-    def drop_n_rocks(n, nmax, xrange, yrange, [s|shapes], revshapes, stream, revstream) do
+    def drop_n_rocks(n, nmax, xrange, yrange, [s|shapes], revshapes, stream, revstream, circular_buffer) do
         revshapes = [s|revshapes]
 
-        {rocks, stream, revstream} = Tetris.drop_rock(xrange, yrange, s, stream, revstream)
+        {rocks, stream, revstream, circular_buffer} = Tetris.drop_rock(xrange, yrange, s, stream, revstream, circular_buffer)
         rocks_top      = Tetris.top(rocks)
 
         yrange = case rocks_top < yrange.first do
@@ -105,16 +120,22 @@ defmodule Tetris do
 
         # draw_chamber(xrange, yrange)
 
-        yrange = case Range.size(yrange) > 1000000 do
+        {yrange, circular_buffer} = case Range.size(yrange) >= 96 do
             true ->
-                IO.inspect({n, :os.timestamp()}, label: "N")
-                Enum.each((yrange.first+100)..yrange.last, fn y -> :ets.delete(:chamber, y) end)
-                yrange.first..(yrange.first+100)
+                # IO.inspect({n, :os.timestamp()}, label: "N")
+
+                cb = Enum.reduce((yrange.first+32)..yrange.last, circular_buffer,
+                    fn y, cb ->
+                        y = rem(abs(y), tuple_size(cb))
+                        put_elem(cb, y, 0)
+                    end)
+                yr = yrange.first..(yrange.first+32)
+                {yr, cb}
             false ->
-                yrange
+                {yrange, circular_buffer}
         end
 
-        drop_n_rocks(n+1, nmax, xrange, yrange, shapes, revshapes, stream, revstream)
+        drop_n_rocks(n+1, nmax, xrange, yrange, shapes, revshapes, stream, revstream, circular_buffer)
     end
 end
 
@@ -130,10 +151,10 @@ stream = String.to_charlist(input_content)
 xrange = 0..8
 yrange = -0..+0
 
-:chamber = :ets.new(:chamber, [:bag, :private, :named_table])
+circular_buffer = List.to_tuple(List.duplicate(0, 128))
 
 # result = Tetris.drop_n_rocks(0, 2, xrange, yrange, shapes, [], stream, [])
-# result = Tetris.drop_n_rocks(0, 2022, xrange, yrange, shapes, [], stream, [])
-result = Tetris.drop_n_rocks(0, 1000000000000, xrange, yrange, shapes, [], stream, [])
+result = Tetris.drop_n_rocks(0, 2022, xrange, yrange, shapes, [], stream, [], circular_buffer)
+# result = Tetris.drop_n_rocks(0, 1000000000000, xrange, yrange, shapes, [], stream, [], circular_buffer)
 
 IO.inspect(abs(elem(result, 1).first), label: "Result")
