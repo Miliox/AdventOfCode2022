@@ -135,6 +135,10 @@ defmodule Tetris do
                 {yrange, circular_buffer}
         end
 
+        if (n &&& ((1 <<< 20)) - 1) == 0 do
+            IO.inspect({n, :os.timestamp()}, label: "N")
+        end
+
         drop_n_rocks(n+1, nmax, xrange, yrange, shapes, revshapes, stream, revstream, circular_buffer)
     end
 end
@@ -154,7 +158,7 @@ yrange = -0..+0
 circular_buffer = List.to_tuple(List.duplicate(0, 128))
 
 # result = Tetris.drop_n_rocks(0, 2, xrange, yrange, shapes, [], stream, [])
-result = Tetris.drop_n_rocks(0, 2022, xrange, yrange, shapes, [], stream, [], circular_buffer)
-# result = Tetris.drop_n_rocks(0, 1000000000000, xrange, yrange, shapes, [], stream, [], circular_buffer)
+# result = Tetris.drop_n_rocks(0, 2022, xrange, yrange, shapes, [], stream, [], circular_buffer)
+result = Tetris.drop_n_rocks(0, 1000000000000, xrange, yrange, shapes, [], stream, [], circular_buffer)
 
 IO.inspect(abs(elem(result, 1).first), label: "Result")
