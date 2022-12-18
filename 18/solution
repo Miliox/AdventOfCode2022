@@ -6,20 +6,28 @@ cubes = input_content |> String.split("\n") |> Enum.map(fn triplet ->
     {x,y,z}
 end)
 
-# xmax = Enum.reduce(cubes, 0, fn
-#     {x,_,_}, xmax when x > xmax -> x
-#     {_,_,_}, xmax -> xmax
-# end)
-# 
-# ymax = Enum.reduce(cubes, 0, fn
-#     {_,y,_}, ymax when y > ymax -> y
-#     {_,_,_}, ymax -> ymax
-# end)
-# 
-# zmax = Enum.reduce(cubes, 0, fn
-#     {_,_,z}, zmax when z > zmax -> z
-#     {_,_,_}, zmax -> zmax
-# end)
+xmax = Enum.reduce(cubes, 0, fn
+    {x,_,_}, xmax when x > xmax -> x
+    {_,_,_}, xmax -> xmax
+end)
+
+xrange = 0..xmax
+
+ymax = Enum.reduce(cubes, 0, fn
+    {_,y,_}, ymax when y > ymax -> y
+    {_,_,_}, ymax -> ymax
+end)
+
+yrange = 0..ymax
+
+zmax = Enum.reduce(cubes, 0, fn
+    {_,_,z}, zmax when z > zmax -> z
+    {_,_,_}, zmax -> zmax
+end)
+
+zrange = 0..zmax
+
+cube_bounds = {xrange, yrange, zrange}
 
 # IO.inspect({xmax, ymax, zmax}, label: "xyz")
 
@@ -35,10 +43,57 @@ defmodule Solution do
     end
 
     def exposed_sides_reduce(adj, count) do
-        case :ets.member(:cubes, adj) do
-            true  -> count
-            false -> count + 1
+        case not :ets.member(:cubes, adj) do
+            true  -> count + 1
+            false -> count
         end
+    end
+
+    def reachable_exposed_sides_proc(parent_pid, _cube = {x,y,z}, bounds) do
+        adjacents = [{x-1,y,z}, {x+1,y,z},
+                     {x,y-1,z}, {x,y+1,z},
+                     {x,y,z-1}, {x,y,z+1}]
+
+        exposed_sides = Enum.reduce(adjacents, 0, fn adj,count -> reachable_exposed_sides_reduce(adj, bounds, count) end)
+
+        send(parent_pid, {:exposed_sides, self(), exposed_sides})
+    end
+
+    def reachable_exposed_sides_reduce(adj, bounds, count) do
+        case not :ets.member(:cubes, adj) and reachable?(adj, bounds) do
+            true  -> count + 1
+            false -> count
+        end
+    end
+
+    def reachable?({x,y,z}, {xrange,yrange,zrange}) do
+        case dfs_flood([{x,y,z}], MapSet.new(), {xrange,yrange,zrange}) do
+            :exposed -> true
+            :trapped -> false
+        end
+    end
+
+    defp dfs_flood([], _visited, _bounds), do: :trapped
+    defp dfs_flood([{x,y,z}|_], _visited, {xrange, yrange, zrange})
+        when x < xrange.first or
+             y < yrange.first or
+             z < zrange.first or
+             x > xrange.last or
+             y > yrange.last or
+             z > zrange.last do
+        :exposed
+    end
+    defp dfs_flood([{x,y,z} | next_to_visit],
+             visited, bounds) do
+        adjacents = [{x-1,y,z}, {x+1,y,z},
+                     {x,y-1,z}, {x,y+1,z},
+                     {x,y,z-1}, {x,y,z+1}]
+
+        adjacents = Enum.reject(adjacents, fn adj ->
+            :ets.member(:cubes, adj) or MapSet.member?(visited, adj)
+        end)
+
+        dfs_flood(adjacents ++ next_to_visit, MapSet.put(visited, {x,y,z}), bounds)
     end
 end
 
@@ -57,3 +112,13 @@ exposed_sides_total = Enum.map(cubes, fn cube -> spawn(Solution, :exposed_sides_
                     |> Enum.sum()
 
 IO.inspect(exposed_sides_total, label: "Part1")
+
+reachable_exposed_sides_total = Enum.map(cubes, fn cube -> spawn(Solution, :reachable_exposed_sides_proc, [self(), cube, {xrange, yrange, zrange}]) end)
+                    |> Enum.map(fn child ->
+                                    receive do
+                                        {:exposed_sides, ^child, exposed_sides} -> exposed_sides
+                                    end
+                               end)
+                    |> Enum.sum()
+
+IO.inspect(reachable_exposed_sides_total, label: "Part2")
