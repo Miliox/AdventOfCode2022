@@ -1,0 +1,59 @@
+#! /usr/bin/env elixir
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+cubes = input_content |> String.split("\n") |> Enum.map(fn triplet ->
+    [x,y,z] = String.split(triplet, ",") |> Enum.map(&String.to_integer/1)
+    {x,y,z}
+end)
+
+# xmax = Enum.reduce(cubes, 0, fn
+#     {x,_,_}, xmax when x > xmax -> x
+#     {_,_,_}, xmax -> xmax
+# end)
+# 
+# ymax = Enum.reduce(cubes, 0, fn
+#     {_,y,_}, ymax when y > ymax -> y
+#     {_,_,_}, ymax -> ymax
+# end)
+# 
+# zmax = Enum.reduce(cubes, 0, fn
+#     {_,_,z}, zmax when z > zmax -> z
+#     {_,_,_}, zmax -> zmax
+# end)
+
+# IO.inspect({xmax, ymax, zmax}, label: "xyz")
+
+defmodule Solution do
+    def exposed_sides_proc(parent_pid, _cube = {x,y,z}) do
+        adjacents = [{x-1,y,z}, {x+1,y,z},
+                     {x,y-1,z}, {x,y+1,z},
+                     {x,y,z-1}, {x,y,z+1}]
+
+        exposed_sides = Enum.reduce(adjacents, 0, &Solution.exposed_sides_reduce/2)
+
+        send(parent_pid, {:exposed_sides, self(), exposed_sides})
+    end
+
+    def exposed_sides_reduce(adj, count) do
+        case :ets.member(:cubes, adj) do
+            true  -> count
+            false -> count + 1
+        end
+    end
+end
+
+# create ets table
+:cubes = :ets.new(:cubes, [:set, :public, :named_table])
+
+# populate ets table
+Enum.each(cubes, fn cube -> true = :ets.insert_new(:cubes, {cube}) end)
+
+exposed_sides_total = Enum.map(cubes, fn cube -> spawn(Solution, :exposed_sides_proc, [self(), cube]) end)
+                    |> Enum.map(fn child ->
+                                    receive do
+                                        {:exposed_sides, ^child, exposed_sides} -> exposed_sides
+                                    end
+                               end)
+                    |> Enum.sum()
+
+IO.inspect(exposed_sides_total, label: "Part1")
