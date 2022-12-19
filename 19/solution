@@ -64,7 +64,7 @@ end
 
 
 defmodule Solution do
-    def simulate([], results), do: prune(results)
+    def simulate([], results), do: prune(MapSet.to_list(MapSet.new(results)))
     def simulate([{n, blueprint, robots, total}|in_progress], results) do
         affordable_robots = Blueprint.afford?(blueprint, total)
 
@@ -103,21 +103,45 @@ defmodule Solution do
         maxs = Enum.reduce(branches, Resources.new(), fn {_, _, robots, total}, max_rs  ->
             Enum.zip_with([robots, max_rs],
                 fn [{kind, r1}, {kind, r2}] -> {kind, max(r1, r2)} end)
-        end) |> IO.inspect()
+        end) # |> IO.inspect()
 
         branches = Enum.filter(branches, fn {_, _, robots, total} ->
             robots[:geode] == maxs[:geode]
         end)
 
-        IO.inspect(length(branches))
+        # IO.inspect(length(branches))
 
         branches
+    end
+
+    def quality_level_proc(parent_pid, blueprint) do
+        results = Enum.reduce(24..1, [{24, blueprint, Resources.new(1), Resources.new()}], fn num, states ->
+            # IO.inspect({self(), num, length(states)}, label: "QProc")
+            states = Solution.simulate(states, [])
+        end)
+
+        geode_max = Enum.reduce(results, 0, fn {_, _, _, total}, geode_max  ->
+            max(geode_max, total[:geode])
+        end)
+
+        send(parent_pid, {:quality_level, self(), geode_max})
     end
 end
 
 blueprints = ArgParser.parse(input_content) |> IO.inspect()
 
-results = Enum.reduce(24..1, [{24, Enum.fetch!(blueprints, 0), Resources.new(1), Resources.new()}], fn _, states ->
-    states = Solution.simulate(states, [])
-end) |> IO.inspect(limit: :infinity)
+procs = Enum.map(blueprints, fn bp -> spawn(Solution, :quality_level_proc, [self(), bp]) end)
+
+quality_levels = Enum.map(procs,
+    fn child ->
+    receive do
+        {:quality_level, ^child, quality_level} -> quality_level
+    end
+end) |> IO.inspect(limit: :infinity, charlists: :as_lists)
+
+Enum.sum(Enum.with_index(quality_levels, fn item, index -> item * (index + 1) end)) |> IO.inspect(label: "Part1")
+
+# results = Enum.reduce(24..1, [{24, Enum.fetch!(blueprints, 0), Resources.new(1), Resources.new()}], fn _, states ->
+#     states = Solution.simulate(states, [])
+# end) |> IO.inspect(limit: :infinity)
 
