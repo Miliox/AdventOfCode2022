@@ -1,0 +1,45 @@
+#! /usr/bin/env elixir
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+defmodule ArgParser do
+    def parse(input) do
+        {:ok, regex} = Regex.compile(
+            "Blueprint (\\d+): Each ore robot costs (\\d+) ore\. " <>
+            "Each clay robot costs (\\d+) ore\\. " <>
+            "Each obsidian robot costs (\\d+) ore and (\\d+) clay. " <>
+            "Each geode robot costs (\\d+) ore and (\\d+) obsidian\.")
+
+        matches = Regex.scan(regex, input)
+
+        Enum.map(matches, fn [_|groups] ->
+            [index,
+             ore_robot_ore_cost,
+             clay_robot_ore_cost,
+             obsidian_robot_ore_cost,
+             obsidian_robot_clay_cost,
+             geode_robot_ore_cost,
+             geode_robot_obsidian_cost] = Enum.map(groups, &String.to_integer/1)
+             [
+                blueprint: index, 
+                ore_robot:
+                    [ore: ore_robot_ore_cost,
+                     clay: 0,
+                     obsidian: 0],
+                clay_robot:
+                    [ore: clay_robot_ore_cost,
+                     clay: 0,
+                     obsidian: 0],
+                obsidian_robot:
+                    [ore: obsidian_robot_ore_cost,
+                     clay: obsidian_robot_clay_cost,
+                     obsidian: 0],
+                geode_robot:
+                    [ore: geode_robot_ore_cost,
+                     clay: 0,
+                     obsidian: geode_robot_obsidian_cost],
+             ]
+        end)
+    end
+end
+
+ArgParser.parse(input_content) |> IO.inspect()
