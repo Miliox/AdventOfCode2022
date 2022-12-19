@@ -1,6 +1,50 @@
 #! /usr/bin/env elixir
 {:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
 
+defmodule Resources do
+    def new(),                           do: new(0,0,0,0)
+    def new(ore),                        do: new(ore, 0, 0, 0)
+    def new(ore, clay),                  do: new(ore, clay, 0, 0)
+    def new(ore, clay, obsidian),        do:  new(ore, clay, obsidian, 0)
+    def new(ore, clay, obsidian, geode), do: [ore: ore, clay: clay, obsidian: obsidian, geode: geode]
+
+    def add(res1, res2) do
+        Enum.zip_with([res1, res2], fn [{kind, r1}, {kind, r2}] -> {kind, r1 + r2} end)
+    end
+
+    def sub(res1, res2) do
+        Enum.zip_with([res1, res2], fn [{kind, r1}, {kind, r2}] -> {kind, r1 - r2} end)
+    end
+
+    def trunc_div(res1, res2) do
+        Enum.min(Enum.zip_with([res1, res2], fn
+            [{kind, r1}, {kind, 0}] -> :inf
+            [{kind, r1}, {kind, r2}] -> div(r1, r2)
+        end))
+    end
+end
+
+defmodule Blueprint do
+    def new([index, ore_robot_ore_cost, clay_robot_ore_cost, obsidian_robot_ore_cost, obsidian_robot_clay_cost, geode_robot_ore_cost, geode_robot_obsidian_cost]) do
+        [
+            blueprint: index, 
+            ore_robot: Resources.new(ore_robot_ore_cost, 0, 0, 0),
+            clay_robot: Resources.new(clay_robot_ore_cost, 0, 0, 0),
+            obsidian_robot: Resources.new(obsidian_robot_ore_cost, obsidian_robot_clay_cost, 0, 0),
+            geode_robot: Resources.new(geode_robot_ore_cost, 0, geode_robot_obsidian_cost, 0)
+        ]
+    end
+
+    def afford?(blueprint, res) do
+        [
+            ore_robot: Resources.trunc_div(res, blueprint[:ore_robot]),
+            clay_robot: Resources.trunc_div(res, blueprint[:clay_robot]),
+            obsidian_robot: Resources.trunc_div(res, blueprint[:obsidian_robot]),
+            geode_robot: Resources.trunc_div(res, blueprint[:geode_robot]),
+        ]
+    end
+end
+
 defmodule ArgParser do
     def parse(input) do
         {:ok, regex} = Regex.compile(
@@ -12,34 +56,45 @@ defmodule ArgParser do
         matches = Regex.scan(regex, input)
 
         Enum.map(matches, fn [_|groups] ->
-            [index,
-             ore_robot_ore_cost,
-             clay_robot_ore_cost,
-             obsidian_robot_ore_cost,
-             obsidian_robot_clay_cost,
-             geode_robot_ore_cost,
-             geode_robot_obsidian_cost] = Enum.map(groups, &String.to_integer/1)
-             [
-                blueprint: index, 
-                ore_robot:
-                    [ore: ore_robot_ore_cost,
-                     clay: 0,
-                     obsidian: 0],
-                clay_robot:
-                    [ore: clay_robot_ore_cost,
-                     clay: 0,
-                     obsidian: 0],
-                obsidian_robot:
-                    [ore: obsidian_robot_ore_cost,
-                     clay: obsidian_robot_clay_cost,
-                     obsidian: 0],
-                geode_robot:
-                    [ore: geode_robot_ore_cost,
-                     clay: 0,
-                     obsidian: geode_robot_obsidian_cost],
-             ]
+            Blueprint.new(Enum.map(groups, &String.to_integer/1))
         end)
     end
 end
 
-ArgParser.parse(input_content) |> IO.inspect()
+
+
+defmodule Solution do
+    def simulate(0, blueprint, robots, total), do: {robots, total}
+    def simulate(n, blueprint, robots, total) do
+        # Collect
+        total = Resources.add(total, robots)
+
+        affordable_robots = Blueprint.afford?(blueprint, total)
+
+        {robots, total} = cond do
+            affordable_robots[:geode_robot] > 0 ->
+                r = Resources.add(robots, Resources.new(0, 0, 0, 1))
+                t = Resources.sub(total, blueprint[:geode_robot])
+                {r, t}
+            affordable_robots[:obsidian_robot] > 0 ->
+                r = Resources.add(robots, Resources.new(0, 0, 1))
+                t = Resources.sub(total, blueprint[:obsidian_robot])
+                {r, t}
+            affordable_robots[:clay_robot] > 0 ->
+                r = Resources.add(robots, Resources.new(0, 1))
+                t = Resources.sub(total, blueprint[:clay_robot])
+                {r, t}
+            affordable_robots[:ore_robot] > 0 ->
+                r = Resources.add(robots, Resources.new(1))
+                t = Resources.sub(total, blueprint[:ore_robot])
+                {r, t}
+            true -> {robots, total}
+        end
+
+        simulate(n - 1, blueprint, robots, total)
+    end
+end
+
+blueprints = ArgParser.parse(input_content) |> IO.inspect()
+
+Solution.simulate(24, Enum.fetch!(blueprints, 0), Resources.new(1), Resources.new()) |> IO.inspect()
