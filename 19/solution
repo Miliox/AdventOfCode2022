@@ -106,7 +106,7 @@ defmodule Solution do
         end) # |> IO.inspect()
 
         branches = Enum.filter(branches, fn {_, _, robots, total} ->
-            robots[:geode] == maxs[:geode]
+            robots[:geode] >= (maxs[:geode] - 1)
         end)
 
         # IO.inspect(length(branches))
@@ -115,7 +115,7 @@ defmodule Solution do
     end
 
     def quality_level_proc(parent_pid, blueprint) do
-        results = Enum.reduce(24..1, [{24, blueprint, Resources.new(1), Resources.new()}], fn num, states ->
+        results = Enum.reduce(32..1, [{32, blueprint, Resources.new(1), Resources.new()}], fn num, states ->
             # IO.inspect({self(), num, length(states)}, label: "QProc")
             states = Solution.simulate(states, [])
         end)
@@ -130,7 +130,8 @@ end
 
 blueprints = ArgParser.parse(input_content) |> IO.inspect()
 
-procs = Enum.map(blueprints, fn bp -> spawn(Solution, :quality_level_proc, [self(), bp]) end)
+# procs = Enum.map(blueprints, fn bp -> spawn(Solution, :quality_level_proc, [self(), bp]) end)
+procs = Enum.map(Enum.slice(blueprints, 0..2), fn bp -> spawn(Solution, :quality_level_proc, [self(), bp]) end)
 
 quality_levels = Enum.map(procs,
     fn child ->
@@ -139,7 +140,7 @@ quality_levels = Enum.map(procs,
     end
 end) |> IO.inspect(limit: :infinity, charlists: :as_lists)
 
-Enum.sum(Enum.with_index(quality_levels, fn item, index -> item * (index + 1) end)) |> IO.inspect(label: "Part1")
+# Enum.sum(Enum.with_index(quality_levels, fn item, index -> item * (index + 1) end)) |> IO.inspect(label: "Part1")
 
 # results = Enum.reduce(24..1, [{24, Enum.fetch!(blueprints, 0), Resources.new(1), Resources.new()}], fn _, states ->
 #     states = Solution.simulate(states, [])
