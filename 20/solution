@@ -1,0 +1,59 @@
+#! /usr/bin/env elixir
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+encrypted_sequence = String.split(input_content) |> Enum.map(&String.to_integer/1) |> IO.inspect()
+
+defmodule Solution do
+    def demixing(seq) do
+        # Mark as tuple encrypted elements
+        seq = Enum.with_index(seq)
+
+        loop(0, length(seq), seq)
+    end
+
+    defp loop(n, n, seq), do: seq
+    defp loop(n, l, seq) do
+        idx = Enum.find_index(seq,
+            fn
+                {_, ^n} -> true
+                _ -> false
+            end)
+
+        {{num, ^n}, seq} = List.pop_at(seq, idx)
+
+        idx = cond do
+                num == 0 -> idx
+                num > 0  and (idx + num) > l ->
+                    rem(idx + num, l) + 1
+                num > 0 ->
+                    idx + num
+                num < 0 and (idx + num) > 0 ->
+                    idx + num
+                num < 0 and (idx + num) <= 0 ->
+                    idx + num - 1
+                
+              end
+
+        seq = List.insert_at(seq, idx, num)
+
+        IO.inspect(seq)
+
+        loop(n + 1, l, seq)
+    end
+end
+
+decrypted_sequence = Solution.demixing(encrypted_sequence) |> IO.inspect(charlists: :as_lists)
+
+n1k = Enum.fetch!(decrypted_sequence,
+    rem(1000 + Enum.find_index(decrypted_sequence, fn 0 -> true; _ -> false end), length(decrypted_sequence)))
+    |> IO.inspect(label: "1000th")
+
+n2k = Enum.fetch!(decrypted_sequence,
+    rem(2000 + Enum.find_index(decrypted_sequence, fn 0 -> true; _ -> false end), length(decrypted_sequence)))
+    |> IO.inspect(label: "2000th")
+
+n3k = Enum.fetch!(decrypted_sequence,
+    rem(3000 + Enum.find_index(decrypted_sequence, fn 0 -> true; _ -> false end), length(decrypted_sequence)))
+    |> IO.inspect(label: "3000th")
+
+IO.inspect(Enum.sum([n1k, n2k, n3k]), label: "Part1")
