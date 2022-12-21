@@ -2,11 +2,51 @@
 {:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
 
 defmodule Solution do
-    def solve(lookup) do
+    def solve_part1(lookup) do
         root_proc = spawn(Solution, :solve_proc, [self(), :root, lookup])
         receive do
             {:reply, ^root_proc, result} -> result
         end
+    end
+
+    def solve_part2_iter(lookup) do
+        [mid_guess] = lookup[:humn]
+        top_guess = 2 * mid_guess
+        low_guess = div(mid_guess, 2)
+
+        {mid_result, baseline}  = solve_part2(lookup)
+        {top_result, ^baseline} = solve_part2(update_guess(lookup, top_guess))
+        {low_result, ^baseline} = solve_part2(update_guess(lookup, low_guess))
+
+        cond do
+            top_result == 0 -> top_guess
+            mid_result == 0 -> mid_guess
+            low_result == 0 -> low_guess
+
+            true -> {{low_result, mid_result, top_result},
+                     {baseline - low_result, baseline - mid_result, baseline - top_result}}
+        end
+    end
+
+    def solve_part2(lookup) do
+        [m1, m2, _] = lookup[:root]
+
+        m1_proc = spawn(Solution, :solve_proc, [self(), m1, lookup])
+        m2_proc = spawn(Solution, :solve_proc, [self(), m2, lookup])
+
+        m1_value = receive do
+            {:reply, ^m1_proc, value} -> value
+        end
+
+        m2_value = receive do
+            {:reply, ^m2_proc, value} -> value
+        end
+
+        {m1_value, m2_value}
+    end
+
+    def update_guess(lookup, guess) do
+        Enum.map(lookup, fn {:humn, _} -> {:humn, [guess]}; kv -> kv end)
     end
 
     def solve_proc(parent, monkey, lookup) do
@@ -64,6 +104,8 @@ monkeys = String.split(input_content, "\n")
         end
     end)
 
-IO.inspect(monkeys, label: "Input", charlists: :as_lists)
+# IO.inspect(monkeys, label: "Input", charlists: :as_lists)
 
-IO.inspect(Solution.solve(monkeys), label: "Part1", charlists: :as_lists)
+# IO.inspect(Solution.solve_part1(monkeys), label: "Part1", charlists: :as_lists)
+
+IO.inspect(Solution.solve_part2_iter(monkeys), label: "Part2", charlists: :as_lists)
