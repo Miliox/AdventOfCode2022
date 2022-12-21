@@ -1,0 +1,69 @@
+#! /usr/bin/env elixir
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+defmodule Solution do
+    def solve(lookup) do
+        root_proc = spawn(Solution, :solve_proc, [self(), :root, lookup])
+        receive do
+            {:reply, ^root_proc, result} -> result
+        end
+    end
+
+    def solve_proc(parent, monkey, lookup) do
+        case lookup[monkey] do
+            [n] ->
+                send(parent, {:reply, self(), n})
+            [m1, m2, op] ->
+                m1_proc = spawn(Solution, :solve_proc, [self(), m1, lookup])
+                m2_proc = spawn(Solution, :solve_proc, [self(), m2, lookup])
+
+                m1_value = receive do
+                    {:reply, ^m1_proc, value} -> value
+                end
+                m2_value = receive do
+                    {:reply, ^m2_proc, value} -> value
+                end
+
+                result = case op do
+                             :add -> m1_value + m2_value
+                             :sub -> m1_value - m2_value
+                             :mul -> m1_value * m2_value
+                             :div -> div(m1_value, m2_value)
+                         end
+                
+                send(parent, {:reply, self(), result})
+        end
+    end
+end
+
+monkeys = String.split(input_content, "\n")
+    |> Enum.map(fn line ->
+        case String.split(line, " ") do
+            [monkey, job_result] ->
+                monkey = String.replace_trailing(monkey, ":", "")
+                monkey = String.to_atom(monkey)
+
+                job_result = String.to_integer(job_result)
+
+                {monkey, [job_result]}
+            [monkey, m1, op, m2] ->
+                monkey = String.replace_trailing(monkey, ":", "")
+                monkey = String.to_atom(monkey)
+
+                m1 = String.to_atom(m1)
+                m2 = String.to_atom(m2)
+
+                op = case op do
+                            "+" -> :add
+                            "-" -> :sub
+                            "*" -> :mul
+                            "/" -> :div 
+                        end
+
+                {monkey, [m1, m2, op]}
+        end
+    end)
+
+IO.inspect(monkeys, label: "Input", charlists: :as_lists)
+
+IO.inspect(Solution.solve(monkeys), label: "Part1", charlists: :as_lists)
