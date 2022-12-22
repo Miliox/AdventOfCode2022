@@ -1,0 +1,19 @@
+#! /usr/bin/env elixir
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+input_content = String.split(input_content, "\n")
+             |> Enum.map(&String.to_charlist/1)
+
+{open_tiles, wall_tiles, directions} = Parser.parse(input_content)
+
+start = Utils.find_start(open_tiles)
+
+IO.inspect(start)
+
+{stop, facing} = Utils.traverse(start, {1, 0}, directions, open_tiles, wall_tiles)
+
+row_score = elem(stop, 1) + 1
+column_score = elem(stop, 0) + 1
+facing_score = Enum.find_index([{1, 0}, {0, 1}, {-1, 0}, {0, -1}], fn dir -> dir == facing end)
+
+IO.inspect(1000 * row_score + 4 * column_score + facing_score, label: "Part1")
