@@ -31,7 +31,7 @@ defmodule Solution do
 end
 
 # Iterate Turns
-Enum.each(1..10, fn round ->
+Enum.each(1..10000, fn round ->
     # Clear
     :ets.delete_all_objects(:next_pos)
 
@@ -76,6 +76,10 @@ Enum.each(1..10, fn round ->
             _      -> moves
         end
     end)
+
+    if length(allowed_moves) == 0 do
+        IO.inspect(round, label: "No move")
+    end
 
     # Apply Moves
     Enum.each(allowed_moves, fn {to, from} ->
