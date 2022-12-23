@@ -1,0 +1,111 @@
+#! /usr/bin/env elixir
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+input_lines = String.split(input_content, "\n") |> Enum.map(&String.to_charlist/1)
+
+:curr_pos = :ets.new(:curr_pos, [:set, :public, :named_table])
+:next_pos = :ets.new(:next_pos, [:bag, :public, :named_table])
+
+# Populate Current Elves Coordinates
+Enum.each(Enum.with_index(input_lines),
+    fn {line, y}  ->
+        Enum.each(Enum.with_index(line), fn
+            {?#, x} -> :ets.insert_new(:curr_pos, {{x,y}})
+            {?., _} -> nil
+        end)
+    end)
+
+directions = [
+    [{0,-1}, {+1,-1}, {-1,-1}],
+    [{0,+1}, {+1,+1}, {-1,+1}],
+    [{-1,0}, {-1,-1}, {-1,+1}],
+    [{+1,0}, {+1,-1}, {+1,+1}],
+]
+
+neighbours = [{-1,-1}, {-1,0}, {-1,+1}, {0,-1}, {0,+1}, {+1,-1}, {+1,0}, {+1,+1}]
+
+defmodule Solution do
+    def  keys(table),                     do: keys(table, :ets.first(table), [])
+    defp keys(_, :"$end_of_table", keys), do: keys
+    defp keys(table, key, keys),          do: keys(table, :ets.next(table, key), [key|keys])
+end
+
+# Iterate Turns
+Enum.each(1..10, fn round ->
+    # Clear
+    :ets.delete_all_objects(:next_pos)
+
+    # Populate move proposals
+    :ets.foldl(    
+        fn {{x,y}}, nil ->
+            # Move only if has neighbours
+            has_neighbours = Enum.any?(neighbours, fn {dx,dy} ->
+                :ets.member(:curr_pos, {x+dx,y+dy})
+            end)
+
+            # Where to move
+            propose_move = case has_neighbours do
+                true -> Enum.find_value((round-1)..(round+3), fn index ->
+                    index = rem(index, length(directions))
+                    adjs  = Enum.fetch!(directions, index)
+
+                    vacant? = Enum.all?(adjs, fn {dx,dy} ->
+                        not :ets.member(:curr_pos, {x+dx,y+dy})
+                    end)
+
+                    if vacant? do
+                        [{dx,dy}, _, _] = adjs
+                        {x+dx,y+dy}
+                    end
+                end)
+                false -> nil
+            end
+
+            case propose_move do
+                nil -> nil
+                {px, py} ->
+                    :ets.insert(:next_pos, {{px,py}, {x,y}})
+            end
+            nil
+        end, nil, :curr_pos)
+
+    # Filter move proposals without collision
+    allowed_moves = Enum.reduce(Solution.keys(:next_pos), [], fn next = {_, _}, moves ->
+        case :ets.lookup(:next_pos, next) do
+            [move] -> [move | moves]
+            _      -> moves
+        end
+    end)
+
+    # Apply Moves
+    Enum.each(allowed_moves, fn {to, from} ->
+        :ets.delete(:curr_pos, from)
+        :ets.insert_new(:curr_pos, {to})
+    end)
+end)
+
+elves_coords = Solution.keys(:curr_pos)
+
+{xrange, yrange} = Enum.reduce(elves_coords, {0..0, 0..0}, fn {x, y}, {xrange, yrange} ->
+    xrange = case xrange.first > x do
+                 true -> x..xrange.last
+                 false -> xrange
+             end
+    xrange = case xrange.last < x do
+                 true -> xrange.first..x
+                 false -> xrange
+             end
+    yrange = case yrange.first > y do
+                 true -> y..yrange.last
+                 false -> yrange
+             end
+    yrange = case yrange.last < y do
+                 true -> yrange.first..y
+                 false -> yrange
+             end
+    {xrange, yrange}
+end) |> IO.inspect()
+
+area = Range.size(xrange) * Range.size(yrange)
+
+IO.inspect(area - length(elves_coords), label: "Part1")
