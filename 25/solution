@@ -1,0 +1,56 @@
+#! /usr/bin/env elixir
+{:ok, input_content} = System.argv() |> Enum.at(0) |> File.read()
+
+defmodule Snafu do
+    def encode(number) do
+        {place, digit} = largest_place_digit(number, 1)
+        encode(number - (place * digit), div(place, 5), [?0 + digit])
+    end
+
+    defp largest_place_digit(number, place) do
+        d = round(number / place)
+        case d do
+            2 -> {place, 2}
+            1 -> {place, 1}
+            _ -> largest_place_digit(number, place * 5)
+        end
+    end
+
+    defp encode(number, 0, digits), do: {Enum.reverse(digits), number}
+    defp encode(number, place, digits) do
+        digit = round(number / place)
+        d = case digit do
+            2 -> ?2
+            1 -> ?1
+            0 -> ?0
+            -1 -> ?-
+            -2 -> ?=
+        end
+        encode(number - (place * digit), div(place, 5), [d|digits])
+    end
+
+    def decode(digits), do: decode(Enum.reverse(digits), 1, [])
+    defp decode([], _, numbers), do: Enum.sum(numbers)
+    defp decode([d|digits], place, numbers) do
+        n = case d do
+            ?2 -> 2
+            ?1 -> 1
+            ?0 -> 0
+            ?- -> -1
+            ?= -> -2
+        end
+        decode(digits, place * 5, [n * place | numbers])
+    end
+end
+
+input_lines = String.split(input_content, "\n") |> Enum.map(&String.to_charlist/1)
+
+input_numbers = Enum.map(input_lines, &Snafu.decode/1)
+
+input_sum = Enum.sum(input_numbers)
+
+{result, 0} = Snafu.encode(input_sum)
+
+IO.inspect(result, label: "Part1")
+
+Enum.map(input_numbers, &Snafu.encode/1) |> IO.inspect()
